@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mega-Sena IA — Analise com Machine Learning</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Variables ─────────────────────────────────────────────── */
+    :root {
+      --bg:       #07090f;
+      --surf:     #0e1220;
+      --surf2:    #141926;
+      --border:   rgba(255,255,255,0.07);
+      --border2:  rgba(255,255,255,0.13);
+      --gold:     #f6c549;
+      --gold-d:   #d4a017;
+      --gold-bg:  rgba(246,197,73,0.08);
+      --gold-bdr: rgba(246,197,73,0.25);
+      --green:    #22d3a0;
+      --red:      #f87171;
+      --blue:     #60a5fa;
+      --purple:   #a78bfa;
+      --text:     #f1f5f9;
+      --sub:      #94a3b8;
+      --muted:    #475569;
+      --r:        14px;
+      --r-sm:     8px;
+    }
+
+    /* ── Reset ─────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.6;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Loading ───────────────────────────────────────────────── */
+    #loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 20px;
+      color: var(--sub);
+      font-size: 15px;
+    }
+    .spinner {
+      width: 44px; height: 44px;
+      border: 3px solid var(--border2);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── App ───────────────────────────────────────────────────── */
+    #app { display: none; }
+    #app.ready { display: block; animation: fadeIn 0.4s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; } }
+
+    .container { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+
+    section { padding: 72px 0; }
+    section + section { border-top: 1px solid var(--border); }
+
+    /* ── Hero ──────────────────────────────────────────────────── */
+    .hero {
+      padding: 88px 0 64px;
+      text-align: center;
+      background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(246,197,73,0.08), transparent);
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--gold-bg);
+      border: 1px solid var(--gold-bdr);
+      color: var(--gold);
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      padding: 5px 14px; border-radius: 999px;
+      margin-bottom: 28px;
+    }
+    .hero h1 {
+      font-size: clamp(40px, 7vw, 80px);
+      font-weight: 900; letter-spacing: -0.03em; line-height: 1.05;
+      background: linear-gradient(140deg, #ffffff 10%, var(--gold) 55%, #d97706 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 20px;
+    }
+    .hero p {
+      color: var(--sub); font-size: 17px; max-width: 520px;
+      margin: 0 auto 40px;
+    }
+    .meta-pills { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .meta-pill {
+      background: var(--surf); border: 1px solid var(--border2);
+      border-radius: 999px; padding: 6px 16px;
+      font-size: 13px; color: var(--sub);
+    }
+    .meta-pill strong { color: var(--text); font-weight: 600; }
+
+    /* ── Section header ────────────────────────────────────────── */
+    .sec-hd { margin-bottom: 36px; }
+    .sec-hd h2 {
+      font-size: 26px; font-weight: 800;
+      letter-spacing: -0.02em; margin-bottom: 8px;
+    }
+    .sec-hd p { color: var(--sub); font-size: 14px; }
+
+    /* ── Quick stats ───────────────────────────────────────────── */
+    .qs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 14px;
+    }
+    .qs-card {
+      background: var(--surf); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 24px 20px; text-align: center;
+      transition: border-color .2s, transform .2s;
+    }
+    .qs-card:hover { border-color: var(--gold-bdr); transform: translateY(-3px); }
+    .qs-val {
+      font-size: 34px; font-weight: 900; letter-spacing: -0.03em;
+      line-height: 1; color: var(--gold); margin-bottom: 8px;
+      font-variant-numeric: tabular-nums;
+    }
+    .qs-lbl { font-size: 12px; color: var(--sub); font-weight: 500; }
+
+    /* ── Lottery balls ─────────────────────────────────────────── */
+    .ball {
+      width: 46px; height: 46px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 15px; flex-shrink: 0;
+      background: radial-gradient(circle at 37% 33%, #fff8e0 0%, var(--gold) 50%, #a0620a 100%);
+      color: #1a0e00;
+      box-shadow:
+        0 3px 10px rgba(0,0,0,0.6),
+        inset 0 1px 3px rgba(255,255,255,0.8),
+        inset 0 -2px 4px rgba(0,0,0,0.35);
+      transition: transform .15s;
+      cursor: default;
+    }
+    .ball:hover { transform: scale(1.12) rotate(-4deg); }
+
+    /* ── Combinations ──────────────────────────────────────────── */
+    .combo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 14px;
+    }
+    .combo-card {
+      background: var(--surf); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 20px;
+      display: flex; flex-direction: column; gap: 16px;
+      transition: border-color .2s, box-shadow .2s, transform .2s;
+    }
+    .combo-card:hover {
+      border-color: var(--gold-bdr);
+      box-shadow: 0 8px 32px rgba(246,197,73,0.07);
+      transform: translateY(-2px);
+    }
+    .combo-card.rank-1 {
+      border-color: var(--gold-bdr);
+      background: linear-gradient(135deg, rgba(246,197,73,0.06), var(--surf));
+    }
+    .combo-top { display: flex; align-items: center; justify-content: space-between; }
+    .combo-rank {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: var(--surf2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; color: var(--sub);
+    }
+    .combo-card.rank-1 .combo-rank { background: var(--gold); color: #000; }
+    .combo-score-txt { font-size: 12px; color: var(--muted); }
+    .combo-score-txt span { color: var(--green); font-weight: 700; font-size: 13px; }
+    .balls { display: flex; gap: 7px; flex-wrap: wrap; }
+    .score-bar { height: 3px; background: var(--surf2); border-radius: 2px; overflow: hidden; }
+    .score-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--green), var(--gold));
+      border-radius: 2px;
+    }
+
+    /* ── Frequency heatmap ─────────────────────────────────────── */
+    .freq-legend {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 18px;
+    }
+    .freq-legend-bar {
+      flex: 1; height: 8px; border-radius: 4px;
+      background: linear-gradient(90deg, #1d4ed8, #22d3a0, #f6c549, #ef4444);
+    }
+    .freq-legend span { font-size: 12px; color: var(--muted); }
+
+    .freq-heatmap {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap: 6px;
+    }
+    .freq-cell {
+      aspect-ratio: 1; border-radius: var(--r-sm);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      cursor: default; position: relative;
+      transition: transform .15s, z-index 0s;
+    }
+    .freq-cell:hover { transform: scale(1.18); z-index: 5; }
+    .freq-cell .fc-n { font-size: 14px; font-weight: 800; line-height: 1; }
+    .freq-cell .fc-f { font-size: 9px; font-weight: 500; opacity: 0.75; margin-top: 2px; }
+
+    /* ── Stats row ─────────────────────────────────────────────── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+    .info-card {
+      background: var(--surf); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 24px;
+    }
+    .info-card h3 {
+      font-size: 11px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.09em;
+      margin-bottom: 20px;
+    }
+
+    /* Even / Odd */
+    .split-bar {
+      height: 10px; border-radius: 5px; overflow: hidden;
+      display: flex; margin-bottom: 14px;
+    }
+    .split-even { background: var(--blue); }
+    .split-odd  { background: var(--purple); flex: 1; }
+    .split-labels { display: flex; justify-content: space-between; font-size: 13px; }
+    .label-even { color: var(--blue); font-weight: 700; }
+    .label-odd  { color: var(--purple); font-weight: 700; }
+    .label-pct  { color: var(--sub); }
+    .split-note {
+      font-size: 12px; color: var(--muted); margin-top: 16px;
+      padding: 10px 12px; background: var(--surf2);
+      border-radius: var(--r-sm); line-height: 1.5;
+    }
+
+    /* Decades */
+    .decade-row {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 11px;
+    }
+    .decade-lbl {
+      font-size: 12px; color: var(--sub); font-weight: 600;
+      width: 44px; flex-shrink: 0;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .decade-bar-wrap {
+      flex: 1; height: 7px; background: var(--surf2);
+      border-radius: 4px; overflow: hidden;
+    }
+    .decade-bar-fill {
+      height: 100%; background: var(--gold);
+      border-radius: 4px; transition: width 1s cubic-bezier(.4,0,.2,1);
+    }
+    .decade-pct {
+      font-size: 12px; color: var(--sub); width: 38px;
+      text-align: right; flex-shrink: 0;
+    }
+
+    /* Sum stats */
+    .sum-big {
+      font-size: 52px; font-weight: 900; color: var(--gold);
+      letter-spacing: -0.03em; line-height: 1;
+      text-align: center; margin-bottom: 4px;
+    }
+    .sum-caption {
+      text-align: center; font-size: 12px; color: var(--muted); margin-bottom: 20px;
+    }
+    .sum-trio {
+      display: flex; justify-content: space-between;
+      background: var(--surf2); border-radius: var(--r-sm); padding: 14px;
+    }
+    .sum-item { text-align: center; }
+    .sum-item-val { font-size: 22px; font-weight: 800; color: var(--text); }
+    .sum-item-lbl { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* ── Validation ────────────────────────────────────────────── */
+    .val-inner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+    .auc-card {
+      background: var(--surf); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 32px 24px; text-align: center;
+    }
+    .auc-card h3 {
+      font-size: 11px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.09em; margin-bottom: 4px;
+    }
+    .auc-value {
+      font-size: 64px; font-weight: 900; letter-spacing: -0.04em;
+      line-height: 1; color: var(--gold); margin: 16px 0 6px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .auc-sub { font-size: 13px; color: var(--sub); margin-bottom: 20px; }
+    .auc-verdict {
+      background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.18);
+      border-radius: var(--r-sm); padding: 14px 16px;
+      font-size: 13px; color: #fca5a5; line-height: 1.6; text-align: left;
+    }
+    .auc-verdict strong { color: var(--red); }
+
+    .feat-card {
+      background: var(--surf); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 24px;
+    }
+    .feat-card h3 {
+      font-size: 11px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.09em; margin-bottom: 20px;
+    }
+    .feat-list { display: flex; flex-direction: column; gap: 14px; }
+    .feat-item {}
+    .feat-header {
+      display: flex; justify-content: space-between; margin-bottom: 6px;
+    }
+    .feat-name { font-size: 13px; font-weight: 600; color: var(--text); }
+    .feat-val  { font-size: 13px; color: var(--sub); font-family: 'JetBrains Mono', monospace; }
+    .feat-bar-wrap {
+      height: 6px; background: var(--surf2);
+      border-radius: 3px; overflow: hidden;
+    }
+    .feat-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--purple), var(--blue));
+      border-radius: 3px;
+      transition: width 1s cubic-bezier(.4,0,.2,1);
+    }
+
+    /* ── Footer ────────────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px 0;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.8;
+    }
+    footer strong { color: var(--sub); }
+
+    /* ── Responsive ────────────────────────────────────────────── */
+    @media (max-width: 700px) {
+      .combo-grid { grid-template-columns: 1fr; }
+      .val-inner  { grid-template-columns: 1fr; }
+      .freq-heatmap { grid-template-columns: repeat(6, 1fr); }
+      .ball { width: 40px; height: 40px; font-size: 13px; }
+      .auc-value { font-size: 48px; }
+    }
+    @media (max-width: 420px) {
+      .freq-heatmap { grid-template-columns: repeat(5, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Loading ──────────────────────────────────────────────────── -->
+<div id="loading">
+  <div class="spinner"></div>
+  <span>Carregando analise da Mega-Sena...</span>
+</div>
+
+<!-- ── App ──────────────────────────────────────────────────────── -->
+<div id="app">
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-badge">Machine Learning · Projeto Educacional</div>
+      <h1>Mega-Sena IA</h1>
+      <p>Analise estatistica do historico completo com Gradient Boosting e validacao temporal honesta.</p>
+      <div class="meta-pills" id="meta-pills"></div>
+    </div>
+  </section>
+
+  <!-- Quick Stats -->
+  <section>
+    <div class="container">
+      <div class="qs-grid" id="qs-grid"></div>
+    </div>
+  </section>
+
+  <!-- Combinations -->
+  <section>
+    <div class="container">
+      <div class="sec-hd">
+        <h2>Top 10 Combinacoes</h2>
+        <p>Geradas por amostragem ponderada pelas probabilidades estimadas pelo modelo treinado com todo o historico.</p>
+      </div>
+      <div class="combo-grid" id="combo-grid"></div>
+    </div>
+  </section>
+
+  <!-- Frequency Heatmap -->
+  <section>
+    <div class="container">
+      <div class="sec-hd">
+        <h2>Frequencia por Numero</h2>
+        <p>Todos os 60 numeros coloridos por frequencia historica. Passe o mouse para ver detalhes.</p>
+      </div>
+      <div class="freq-legend">
+        <span>Baixa</span>
+        <div class="freq-legend-bar"></div>
+        <span>Alta</span>
+      </div>
+      <div class="freq-heatmap" id="freq-heatmap"></div>
+    </div>
+  </section>
+
+  <!-- Stats Row -->
+  <section>
+    <div class="container">
+      <div class="sec-hd">
+        <h2>Analise Estatistica</h2>
+        <p>Distribuicoes historicas dos sorteios da Mega-Sena desde 1996.</p>
+      </div>
+      <div class="stats-row">
+        <div class="info-card">
+          <h3>Par vs Impar</h3>
+          <div id="even-odd"></div>
+        </div>
+        <div class="info-card">
+          <h3>Distribuicao por Decadas</h3>
+          <div id="decades"></div>
+        </div>
+        <div class="info-card">
+          <h3>Soma dos 6 Numeros por Sorteio</h3>
+          <div id="sum-stats"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Validation -->
+  <section>
+    <div class="container">
+      <div class="sec-hd">
+        <h2>Transparencia do Modelo</h2>
+        <p>O modelo realmente aprende algo? Validacao temporal honesta com 80% treino / 20% teste.</p>
+      </div>
+      <div class="val-inner">
+        <div class="auc-card" id="auc-card"></div>
+        <div class="feat-card">
+          <h3>Importancia das Features</h3>
+          <div class="feat-list" id="feat-list"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <p>
+        <strong>Aviso:</strong> Este e um projeto educacional. Loterias sao processos aleatorios por design.<br>
+        Nenhum modelo de machine learning consegue prever resultados futuros — AUC ~ 0.5 confirma isso.<br><br>
+        Dataset: Kaggle &nbsp;·&nbsp; Modelo: GradientBoostingClassifier (scikit-learn) &nbsp;·&nbsp;
+        Gerado em: <span id="gen-date">—</span>
+      </p>
+    </div>
+  </footer>
+
+</div><!-- #app -->
+
+<script>
+  // ── Utility: heat color (0=cold/blue → 1=hot/red) ──────────────
+  function heatColor(t) {
+    const stops = [
+      [0,    [29,  78,  216]],
+      [0.35, [34,  211, 160]],
+      [0.65, [246, 197, 73 ]],
+      [1,    [239, 68,  68 ]],
+    ];
+    let i = 0;
+    while (i < stops.length - 2 && t > stops[i + 1][0]) i++;
+    const [t0, c0] = stops[i], [t1, c1] = stops[i + 1];
+    const f = (t - t0) / (t1 - t0);
+    const ch = c0.map((v, j) => Math.round(v + (c1[j] - v) * f));
+    return { bg: `rgb(${ch})`, dark: t > 0.45 };
+  }
+
+  // ── Render ──────────────────────────────────────────────────────
+  function render(d) {
+    const { meta, combinations, numbers, even_odd, decades, sum_stats, consecutive, validation } = d;
+
+    // Meta pills
+    document.getElementById('meta-pills').innerHTML = `
+      <div class="meta-pill"><strong>${meta.total_draws.toLocaleString('pt-BR')}</strong> sorteios</div>
+      <div class="meta-pill"><strong>${meta.date_start}</strong> ate <strong>${meta.date_end}</strong></div>
+      <div class="meta-pill">Gerado em <strong>${meta.generated_at}</strong></div>
+    `;
+    document.getElementById('gen-date').textContent = meta.generated_at;
+
+    // Quick stats
+    const years = new Date(meta.date_end).getFullYear() - new Date(meta.date_start).getFullYear();
+    document.getElementById('qs-grid').innerHTML = [
+      [meta.total_draws.toLocaleString('pt-BR'), 'Sorteios Historicos'],
+      [years + '+',                               'Anos de Dados'],
+      [validation.auc_model.toFixed(4),           'AUC-ROC do Modelo'],
+      [even_odd.even_pct + '%',                   'Numeros Pares Sorteados'],
+      [sum_stats.mean,                             'Soma Media por Sorteio'],
+      [consecutive.none_pct + '%',                'Sorteios Sem Consecutivos'],
+    ].map(([v, l]) => `
+      <div class="qs-card">
+        <div class="qs-val">${v}</div>
+        <div class="qs-lbl">${l}</div>
+      </div>
+    `).join('');
+
+    // Combinations
+    const maxS = combinations[0].score;
+    const minS = combinations[combinations.length - 1].score;
+    const rng  = maxS - minS || 0.001;
+    document.getElementById('combo-grid').innerHTML = combinations.map((c, i) => {
+      const bw = (((c.score - minS) / rng) * 65 + 35).toFixed(1);
+      return `
+        <div class="combo-card ${i === 0 ? 'rank-1' : ''}">
+          <div class="combo-top">
+            <div class="combo-rank">${i + 1}</div>
+            <div class="combo-score-txt">Score <span>${c.score.toFixed(4)}</span></div>
+          </div>
+          <div class="balls">${c.numbers.map(n => `<div class="ball">${n}</div>`).join('')}</div>
+          <div class="score-bar"><div class="score-bar-fill" style="width:${bw}%"></div></div>
+        </div>
+      `;
+    }).join('');
+
+    // Frequency heatmap
+    const freqs = numbers.map(n => n.freq);
+    const fMin = Math.min(...freqs), fMax = Math.max(...freqs);
+    document.getElementById('freq-heatmap').innerHTML = numbers.map(n => {
+      const t = (n.freq - fMin) / (fMax - fMin);
+      const { bg, dark } = heatColor(t);
+      const fg = dark ? '#000' : '#fff';
+      return `
+        <div class="freq-cell" style="background:${bg};color:${fg}"
+             title="Numero ${n.n}: ${n.freq}x (${n.pct}%) | Atraso atual: ${n.delay}">
+          <div class="fc-n">${n.n}</div>
+          <div class="fc-f">${n.freq}x</div>
+        </div>
+      `;
+    }).join('');
+
+    // Even / Odd
+    document.getElementById('even-odd').innerHTML = `
+      <div class="split-bar">
+        <div class="split-even" style="width:${even_odd.even_pct}%"></div>
+        <div class="split-odd"></div>
+      </div>
+      <div class="split-labels">
+        <div><span class="label-even">Pares</span> <span class="label-pct">${even_odd.even_pct}%</span></div>
+        <div><span class="label-odd">Impares</span> <span class="label-pct">${even_odd.odd_pct}%</span></div>
+      </div>
+      <div class="split-note">
+        Esperado por acaso: ~50% / ~50%.<br>
+        Distribuicao uniforme confirma aleatoriedade.
+      </div>
+    `;
+
+    // Decades
+    const maxPct = Math.max(...decades.map(d => d.pct));
+    document.getElementById('decades').innerHTML = decades.map(d => `
+      <div class="decade-row">
+        <div class="decade-lbl">${d.label}</div>
+        <div class="decade-bar-wrap">
+          <div class="decade-bar-fill" style="width:${(d.pct / maxPct * 100).toFixed(1)}%"></div>
+        </div>
+        <div class="decade-pct">${d.pct}%</div>
+      </div>
+    `).join('');
+
+    // Sum stats
+    document.getElementById('sum-stats').innerHTML = `
+      <div class="sum-big">${sum_stats.mean}</div>
+      <div class="sum-caption">media da soma dos 6 numeros</div>
+      <div class="sum-trio">
+        <div class="sum-item">
+          <div class="sum-item-val">${sum_stats.min}</div>
+          <div class="sum-item-lbl">Minimo</div>
+        </div>
+        <div class="sum-item">
+          <div class="sum-item-val">±${sum_stats.std}</div>
+          <div class="sum-item-lbl">Desvio</div>
+        </div>
+        <div class="sum-item">
+          <div class="sum-item-val">${sum_stats.max}</div>
+          <div class="sum-item-lbl">Maximo</div>
+        </div>
+      </div>
+    `;
+
+    // AUC card
+    const diff = (validation.auc_model - validation.auc_baseline).toFixed(4);
+    const sign = diff >= 0 ? '+' : '';
+    document.getElementById('auc-card').innerHTML = `
+      <h3>AUC-ROC — Validacao Temporal</h3>
+      <div class="auc-value">${validation.auc_model.toFixed(4)}</div>
+      <div class="auc-sub">
+        Treino: ${validation.train_draws.toLocaleString('pt-BR')} sorteios
+        &nbsp;·&nbsp;
+        Teste: ${validation.test_draws.toLocaleString('pt-BR')} sorteios
+      </div>
+      <div class="auc-verdict">
+        Diferenca vs baseline constante: <strong>${sign}${diff}</strong><br><br>
+        AUC proximo de 0.5 significa que o modelo <strong>nao supera o acaso</strong>.
+        Isso e esperado e confirma a integridade estatistica da loteria.
+      </div>
+    `;
+
+    // Feature importance
+    const maxImp = validation.feature_importance[0].value;
+    document.getElementById('feat-list').innerHTML = validation.feature_importance.map(f => `
+      <div class="feat-item">
+        <div class="feat-header">
+          <span class="feat-name">${f.name}</span>
+          <span class="feat-val">${(f.value * 100).toFixed(1)}%</span>
+        </div>
+        <div class="feat-bar-wrap">
+          <div class="feat-bar-fill" style="width:${(f.value / maxImp * 100).toFixed(1)}%"></div>
+        </div>
+      </div>
+    `).join('');
+
+    // Show app
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').classList.add('ready');
+  }
+
+  // ── Fetch data ──────────────────────────────────────────────────
+  fetch('./results.json')
+    .then(r => {
+      if (!r.ok) throw new Error('not found');
+      return r.json();
+    })
+    .then(render)
+    .catch(() => {
+      document.getElementById('loading').innerHTML = `
+        <div style="text-align:center;padding:40px;max-width:480px">
+          <div style="font-size:48px;margin-bottom:20px">⚠️</div>
+          <h2 style="font-size:22px;margin-bottom:12px;color:#f1f5f9">results.json nao encontrado</h2>
+          <p style="color:#64748b;margin-bottom:24px;font-size:14px">
+            Execute o script para gerar os dados antes de abrir a interface:
+          </p>
+          <code style="
+            background:#0e1220;border:1px solid rgba(255,255,255,0.1);
+            border-radius:8px;padding:12px 20px;display:inline-block;
+            font-family:'JetBrains Mono',monospace;font-size:14px;color:#22d3a0
+          ">python generate_results.py</code>
+        </div>
+      `;
+    });
+</script>
+</body>
+</html>
