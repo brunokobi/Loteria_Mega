@@ -2,7 +2,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
 ![Machine Learning](https://img.shields.io/badge/Machine%20Learning-Gradient%20Boosting-green)
-![Status](https://img.shields.io/badge/Status-Experimental-orange)
+![Status](https://img.shields.io/badge/Status-Ativo-orange)
 ![License](https://img.shields.io/badge/License-Educational-lightgrey)
 ![Dataset](https://img.shields.io/badge/Dataset-Mega--Sena-brightgreen)
 [![Netlify](https://img.shields.io/badge/Deploy-Netlify-00C7B7?logo=netlify&logoColor=white)](https://loteriabruno.netlify.app)
