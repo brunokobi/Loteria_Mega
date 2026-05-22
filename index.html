@@ -75,33 +75,82 @@
 
     /* ── Hero ──────────────────────────────────────────────────── */
     .hero {
-      padding: 88px 0 64px;
+      position: relative; overflow: hidden;
+      min-height: 92vh;
+      display: flex; align-items: center;
       text-align: center;
-      background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(246,197,73,0.08), transparent);
+      padding: 100px 0 80px;
     }
-    .hero-badge {
-      display: inline-flex; align-items: center; gap: 6px;
-      background: var(--gold-bg);
-      border: 1px solid var(--gold-bdr);
-      color: var(--gold);
-      font-size: 11px; font-weight: 700;
-      letter-spacing: 0.1em; text-transform: uppercase;
-      padding: 5px 14px; border-radius: 999px;
-      margin-bottom: 28px;
+    .hero > .container { position: relative; z-index: 1; width: 100%; }
+
+    /* Aurora background */
+    .hero-bg { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+    .aurora-orb {
+      position: absolute; border-radius: 50%;
+      filter: blur(110px); opacity: 0.11;
+      will-change: transform;
+      animation: aurora var(--dur, 13s) ease-in-out infinite alternate;
     }
+    @keyframes aurora {
+      from { transform: translate(0, 0) scale(1); }
+      to   { transform: translate(var(--tx, 6%), var(--ty, 6%)) scale(1.1); }
+    }
+
+    /* Floating balls */
+    .hero-ball-wrap { position: absolute; will-change: transform; }
+    .hero-ball-bg {
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; user-select: none;
+      background: radial-gradient(circle at 37% 33%, #fff8e0 0%, #f6c549 50%, #9a5c08 100%);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.4), inset 0 1px 3px rgba(255,255,255,0.55);
+      color: #1a0e00;
+      will-change: transform;
+      animation: hero-float var(--dur, 5s) var(--delay, 0s) ease-in-out infinite alternate;
+    }
+    @keyframes hero-float {
+      from { transform: translateY(0) rotate(0deg); }
+      to   { transform: translateY(var(--dy, -10px)) rotate(var(--dr, 5deg)); }
+    }
+
+    /* Title shimmer */
+    .hero-badge { animation: hero-rise 0.7s 0s cubic-bezier(.22,1,.36,1) both; }
     .hero h1 {
       font-size: clamp(40px, 7vw, 80px);
       font-weight: 900; letter-spacing: -0.03em; line-height: 1.05;
-      background: linear-gradient(140deg, #ffffff 10%, var(--gold) 55%, #d97706 100%);
+      background: linear-gradient(
+        90deg,
+        #e2e8f0 0%, #ffffff 15%,
+        #f6c549 30%, #fff4c2 42%,
+        #ffffff 50%,
+        #fff4c2 58%, #f6c549 70%,
+        #ffffff 85%, #d97706 100%
+      );
+      background-size: 250% auto;
       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
       background-clip: text;
       margin-bottom: 20px;
+      animation:
+        title-shimmer 6s linear infinite,
+        hero-rise 0.9s 0.1s cubic-bezier(.22,1,.36,1) both;
+    }
+    @keyframes title-shimmer {
+      0%   { background-position: 140% center; }
+      100% { background-position: -60% center; }
+    }
+    @keyframes hero-rise {
+      from { opacity: 0; transform: translateY(28px) scale(0.97); }
+      to   { opacity: 1; transform: none; }
     }
     .hero p {
       color: var(--sub); font-size: 17px; max-width: 520px;
       margin: 0 auto 40px;
+      animation: hero-rise 0.7s 0.28s cubic-bezier(.22,1,.36,1) both;
     }
-    .meta-pills { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .meta-pills {
+      display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+      animation: hero-rise 0.7s 0.44s cubic-bezier(.22,1,.36,1) both;
+    }
     .meta-pill {
       background: var(--surf); border: 1px solid var(--border2);
       border-radius: 999px; padding: 6px 16px;
@@ -486,6 +535,7 @@
 
   <!-- Hero -->
   <section class="hero">
+    <div class="hero-bg" id="hero-bg"></div>
     <div class="container">
       <div class="hero-badge">Machine Learning · Projeto Educacional</div>
       <h1>Mega-Sena IA</h1>
@@ -583,6 +633,75 @@
 </div><!-- #app -->
 
 <script>
+  // ── Hero: aurora orbs + floating balls + parallax ───────────────
+  (function initHero() {
+    const bg = document.getElementById('hero-bg');
+    if (!bg) return;
+
+    // Aurora orbs
+    [
+      { w:700, h:520, x:-8,  y:-35, c:'#f6c549', dur:14, tx:'7%',  ty:'9%',  spd:0.07 },
+      { w:560, h:560, x:58,  y:-15, c:'#7c3aed', dur:18, tx:'-7%', ty:'6%',  spd:0.04 },
+      { w:440, h:440, x:22,  y:42,  c:'#1d4ed8', dur:11, tx:'5%',  ty:'-7%', spd:0.06 },
+      { w:320, h:320, x:72,  y:55,  c:'#059669', dur:16, tx:'-4%', ty:'5%',  spd:0.05 },
+    ].forEach(a => {
+      const el = document.createElement('div');
+      el.className = 'aurora-orb';
+      el.dataset.spd = a.spd;
+      el.style.cssText = `width:${a.w}px;height:${a.h}px;left:${a.x}%;top:${a.y}%;background:${a.c};--dur:${a.dur}s;--tx:${a.tx};--ty:${a.ty}`;
+      bg.appendChild(el);
+    });
+
+    // Floating balls — posicoes, tamanhos e velocidades fixas para layout intencional
+    const config = [
+      { n:10, x:6,  y:14, s:38, o:0.20, dur:4.6, dl:-0.0, dy:-12, dr:8  },
+      { n:23, x:87, y:18, s:28, o:0.14, dur:5.3, dl:-1.2, dy:-9,  dr:-7 },
+      { n:41, x:14, y:62, s:44, o:0.22, dur:3.9, dl:-2.8, dy:-14, dr:11 },
+      { n:52, x:83, y:68, s:24, o:0.11, dur:6.1, dl:-0.5, dy:-7,  dr:-10},
+      { n:4,  x:44, y:88, s:40, o:0.16, dur:4.9, dl:-3.4, dy:-13, dr:6  },
+      { n:33, x:3,  y:44, s:30, o:0.18, dur:5.6, dl:-1.8, dy:-10, dr:-8 },
+      { n:7,  x:91, y:48, s:34, o:0.13, dur:3.6, dl:-0.3, dy:-11, dr:14 },
+      { n:18, x:29, y:8,  s:22, o:0.09, dur:5.9, dl:-2.1, dy:-7,  dr:-5 },
+      { n:59, x:64, y:6,  s:46, o:0.19, dur:4.3, dl:-1.5, dy:-15, dr:9  },
+      { n:36, x:54, y:74, s:26, o:0.12, dur:6.6, dl:-3.0, dy:-8,  dr:-12},
+      { n:45, x:73, y:32, s:36, o:0.17, dur:5.1, dl:-0.8, dy:-12, dr:7  },
+      { n:2,  x:19, y:80, s:20, o:0.08, dur:4.1, dl:-2.4, dy:-6,  dr:-9 },
+      { n:27, x:38, y:50, s:32, o:0.10, dur:5.7, dl:-1.0, dy:-10, dr:12 },
+      { n:15, x:78, y:85, s:42, o:0.15, dur:3.8, dl:-3.8, dy:-13, dr:-6 },
+    ];
+
+    config.forEach(({ n, x, y, s, o, dur, dl, dy, dr }) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'hero-ball-wrap';
+      wrap.dataset.spd = (0.08 + (s / 200)).toFixed(3);
+      wrap.style.cssText = `left:${x}%;top:${y}%`;
+
+      const ball = document.createElement('div');
+      ball.className = 'hero-ball-bg';
+      ball.textContent = n;
+      ball.style.cssText = `width:${s}px;height:${s}px;font-size:${Math.round(s*.38)}px;opacity:${o};--dur:${dur}s;--delay:${dl}s;--dy:${dy}px;--dr:${dr}deg`;
+
+      wrap.appendChild(ball);
+      bg.appendChild(wrap);
+    });
+
+    // Parallax on scroll
+    let raf = null;
+    window.addEventListener('scroll', () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        const sy = window.scrollY;
+        bg.querySelectorAll('.aurora-orb').forEach(el => {
+          el.style.transform = `translateY(${sy * el.dataset.spd}px)`;
+        });
+        bg.querySelectorAll('.hero-ball-wrap').forEach(el => {
+          el.style.transform = `translateY(${sy * el.dataset.spd}px)`;
+        });
+        raf = null;
+      });
+    }, { passive: true });
+  })();
+
   // ── Utility: heat color (0=cold/blue → 1=hot/red) ──────────────
   function heatColor(t) {
     const stops = [
