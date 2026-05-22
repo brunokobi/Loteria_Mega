@@ -97,13 +97,24 @@
     }
 
     /* Cursor glow */
-    .hero::after {
-      content: '';
-      position: absolute; pointer-events: none; z-index: 0;
-      width: 420px; height: 420px; border-radius: 50%;
-      background: radial-gradient(circle, rgba(246,197,73,0.07) 0%, transparent 68%);
-      transform: translate(var(--gx, -9999px), var(--gy, -9999px)) translate(-50%, -50%);
-      transition: opacity 0.4s;
+    .hero-glow {
+      position: absolute; pointer-events: none; z-index: 1;
+      transform: translate(-50%, -50%);
+      opacity: 0; transition: opacity 0.35s ease;
+    }
+    .hero-glow.visible { opacity: 1; }
+    .hero-glow-outer {
+      position: absolute; border-radius: 50%;
+      width: 560px; height: 560px;
+      top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: radial-gradient(circle, rgba(246,197,73,0.09) 0%, rgba(246,197,73,0.03) 40%, transparent 70%);
+    }
+    .hero-glow-inner {
+      position: absolute; border-radius: 50%;
+      width: 180px; height: 180px;
+      top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: radial-gradient(circle, rgba(255,240,160,0.18) 0%, rgba(246,197,73,0.08) 45%, transparent 70%);
+      filter: blur(2px);
     }
 
     /* Floating balls */
@@ -552,6 +563,10 @@
   <!-- Hero -->
   <section class="hero">
     <div class="hero-bg" id="hero-bg"></div>
+    <div class="hero-glow" id="hero-glow">
+      <div class="hero-glow-outer"></div>
+      <div class="hero-glow-inner"></div>
+    </div>
     <div class="container">
       <div class="hero-badge">Machine Learning · Projeto Educacional</div>
       <h1>Mega-Sena IA</h1>
@@ -753,15 +768,21 @@
     }
     function startLoop() { if (!loopId) loopId = requestAnimationFrame(physicsLoop); }
 
+    // ── Cursor glow element ──────────────────────────────────────
+    const glowEl = document.getElementById('hero-glow');
+
     // ── Mouse events ─────────────────────────────────────────────
     heroEl.addEventListener('mousemove', e => {
       mx = e.clientX; my = e.clientY;
       if (!inHero) { inHero = true; startLoop(); }
 
-      // Cursor glow
+      // Cursor glow — centered exactly on cursor
       const rect = heroEl.getBoundingClientRect();
-      heroEl.style.setProperty('--gx', `${e.clientX - rect.left}px`);
-      heroEl.style.setProperty('--gy', `${e.clientY - rect.top}px`);
+      const lx = e.clientX - rect.left;
+      const ly = e.clientY - rect.top;
+      glowEl.style.left = lx + 'px';
+      glowEl.style.top  = ly + 'px';
+      glowEl.classList.add('visible');
 
       // Aurora tilt
       const cx = (e.clientX - rect.left)  / rect.width  - 0.5;
@@ -776,7 +797,7 @@
     heroEl.addEventListener('mouseleave', () => {
       mx = -9999; my = -9999; inHero = false;
       startLoop();
-      heroEl.style.setProperty('--gx', '-9999px');
+      glowEl.classList.remove('visible');
       auroras.forEach(a => {
         a.tx = 0; a.ty = 0;
         a.el.style.transition = 'transform 1.4s ease';
