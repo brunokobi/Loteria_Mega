@@ -342,6 +342,33 @@
       transition: width 1s cubic-bezier(.4,0,.2,1);
     }
 
+    /* ── Update button ─────────────────────────────────────────── */
+    .update-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--surf); border: 1px solid var(--border2);
+      color: var(--text); font-size: 14px; font-weight: 600;
+      padding: 10px 20px; border-radius: 999px;
+      cursor: pointer; transition: border-color .2s, background .2s, transform .2s;
+      font-family: inherit;
+      margin-top: 20px;
+    }
+    .update-btn:hover:not(:disabled) {
+      border-color: var(--gold-bdr); background: var(--gold-bg);
+      color: var(--gold); transform: translateY(-1px);
+    }
+    .update-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .update-btn .btn-icon { font-size: 16px; line-height: 1; }
+    .update-btn.loading .btn-icon { animation: spin 0.75s linear infinite; display: inline-block; }
+
+    .update-toast {
+      display: none; margin-top: 14px;
+      padding: 10px 18px; border-radius: var(--r-sm);
+      font-size: 13px; font-weight: 500;
+    }
+    .update-toast.ok  { background: rgba(34,211,160,0.1); border: 1px solid rgba(34,211,160,0.25); color: var(--green); }
+    .update-toast.err { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.25); color: var(--red); }
+    .update-toast.show { display: inline-block; }
+
     /* ── Footer ────────────────────────────────────────────────── */
     footer {
       border-top: 1px solid var(--border);
@@ -384,6 +411,12 @@
       <h1>Mega-Sena IA</h1>
       <p>Analise estatistica do historico completo com Gradient Boosting e validacao temporal honesta.</p>
       <div class="meta-pills" id="meta-pills"></div>
+      <div>
+        <button class="update-btn" id="update-btn" onclick="triggerBuild()">
+          <span class="btn-icon">↻</span> Atualizar Analise
+        </button>
+        <div class="update-toast" id="update-toast"></div>
+      </div>
     </div>
   </section>
 
@@ -637,6 +670,40 @@
     // Show app
     document.getElementById('loading').style.display = 'none';
     document.getElementById('app').classList.add('ready');
+  }
+
+  // ── Trigger new build ───────────────────────────────────────────
+  function triggerBuild() {
+    const btn   = document.getElementById('update-btn');
+    const toast = document.getElementById('update-toast');
+
+    btn.disabled = true;
+    btn.classList.add('loading');
+    btn.querySelector('.btn-icon').textContent = '↻';
+    toast.className = 'update-toast';
+    toast.textContent = '';
+
+    fetch('/.netlify/functions/trigger-build', { method: 'POST' })
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          toast.textContent = '✓ ' + data.message;
+          toast.className = 'update-toast ok show';
+        } else {
+          toast.textContent = '✗ ' + (data.error || 'Erro desconhecido');
+          toast.className = 'update-toast err show';
+          btn.disabled = false;
+        }
+      })
+      .catch(() => {
+        toast.textContent = '✗ Nao foi possivel conectar. Verifique se esta no Netlify.';
+        toast.className = 'update-toast err show';
+        btn.disabled = false;
+      })
+      .finally(() => {
+        btn.classList.remove('loading');
+        btn.querySelector('.btn-icon').textContent = '↻';
+      });
   }
 
   // ── Fetch data ──────────────────────────────────────────────────
