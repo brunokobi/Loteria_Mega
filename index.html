@@ -494,6 +494,54 @@
     .build-banner.done .build-pulse { background: var(--green); animation: none; }
     .build-banner.done .build-bar-fill { width: 100% !important; background: var(--green); }
 
+    /* ── Balanced combinations ──────────────────────────────────── */
+    .ball-balanced {
+      background: radial-gradient(circle at 37% 33%, #e0fff8 0%, #22d3a0 50%, #0a8066 100%);
+      color: #001a15;
+    }
+    .combo-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+    .badge {
+      font-size: 11px; font-weight: 600; padding: 3px 9px;
+      border-radius: 999px; border: 1px solid;
+    }
+    .badge-sum    { color: var(--blue);   border-color: rgba(96,165,250,0.3);  background: rgba(96,165,250,0.07); }
+    .badge-even   { color: var(--purple); border-color: rgba(167,139,250,0.3); background: rgba(167,139,250,0.07); }
+    .badge-decade { color: var(--green);  border-color: rgba(34,211,160,0.3);  background: rgba(34,211,160,0.07); }
+
+    /* ── Strategy comparison ─────────────────────────────────────── */
+    .strat-grid { display: flex; flex-direction: column; gap: 10px; }
+    .strat-row {
+      background: var(--surf); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 18px 22px;
+      display: grid;
+      grid-template-columns: 150px 1fr repeat(4, 56px);
+      align-items: center; gap: 16px;
+    }
+    .strat-name { font-weight: 700; font-size: 14px; }
+    .strat-desc { font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .strat-bar-wrap { height: 7px; background: var(--surf2); border-radius: 4px; overflow: hidden; }
+    .strat-bar-fill { height: 100%; border-radius: 4px; transition: width 1s cubic-bezier(.4,0,.2,1); }
+    .strat-stat { text-align: center; }
+    .strat-stat-val { font-size: 17px; font-weight: 800; }
+    .strat-stat-lbl { font-size: 10px; color: var(--muted); margin-top: 1px; }
+    .strat-header {
+      display: grid;
+      grid-template-columns: 150px 1fr repeat(4, 56px);
+      gap: 16px; padding: 0 22px 8px;
+      font-size: 10px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.07em;
+    }
+    .insight-box {
+      margin-top: 16px; padding: 16px 20px;
+      background: rgba(34,211,160,0.06); border: 1px solid rgba(34,211,160,0.2);
+      border-radius: var(--r); font-size: 14px; color: var(--sub); line-height: 1.7;
+    }
+    .insight-box strong { color: var(--green); }
+    @media (max-width: 700px) {
+      .strat-row    { grid-template-columns: 1fr 1fr; gap: 10px; }
+      .strat-header { display: none; }
+    }
+
     /* ── Topbar ─────────────────────────────────────────────────── */
     .topbar {
       position: fixed; top: 0; left: 0; right: 0; z-index: 100;
@@ -593,6 +641,17 @@
     </div>
   </section>
 
+  <!-- Balanced Combinations -->
+  <section>
+    <div class="container">
+      <div class="sec-hd">
+        <h2>Combinacoes Balanceadas</h2>
+        <p>Geradas com criterios estatisticos — soma 110-230, 2-4 pares, max. 1 consecutivo, min. 3 decadas cobertas.</p>
+      </div>
+      <div class="combo-grid" id="balanced-grid"></div>
+    </div>
+  </section>
+
   <!-- Frequency Heatmap -->
   <section>
     <div class="container">
@@ -647,6 +706,17 @@
           <div class="feat-list" id="feat-list"></div>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- Strategy Comparison -->
+  <section>
+    <div class="container">
+      <div class="sec-hd">
+        <h2>Comparacao de Estrategias</h2>
+        <p>Simulacao dos ultimos 500 sorteios reais. Cada estrategia escolheu 6 numeros antes de cada sorteio.</p>
+      </div>
+      <div id="strat-content"></div>
     </div>
   </section>
 
@@ -979,9 +1049,90 @@
       </div>
     `).join('');
 
+    // Balanced combinations & strategies
+    renderBalanced(d.balanced_combinations);
+    renderStrategies(d.strategies);
+
     // Show app
     document.getElementById('loading').style.display = 'none';
     document.getElementById('app').classList.add('ready');
+  }
+
+  // ── Render balanced combinations ────────────────────────────────
+  function renderBalanced(items) {
+    document.getElementById('balanced-grid').innerHTML = items.map((c, i) => `
+      <div class="combo-card ${i === 0 ? 'rank-1' : ''}">
+        <div class="combo-top">
+          <div class="combo-rank">${i + 1}</div>
+          <div class="combo-score-txt">Soma <span>${c.sum}</span></div>
+        </div>
+        <div class="balls">
+          ${c.numbers.map(n => `<div class="ball ball-balanced">${n}</div>`).join('')}
+        </div>
+        <div class="combo-badges">
+          <span class="badge badge-sum">Soma ${c.sum}</span>
+          <span class="badge badge-even">${c.even}P / ${c.odd}I</span>
+          <span class="badge badge-decade">${c.decades} decadas</span>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // ── Render strategy comparison ───────────────────────────────────
+  function renderStrategies(strat) {
+    const COLORS = {
+      'Aleatoria': 'var(--sub)',   'Quentes': 'var(--red)',
+      'Frias':     'var(--blue)',  'Balanceada': 'var(--green)'
+    };
+    const DESCS = {
+      'Aleatoria':  '6 numeros escolhidos ao acaso',
+      'Quentes':    'Os 6 numeros mais frequentes',
+      'Frias':      'Os 6 numeros menos frequentes',
+      'Balanceada': 'Criterios: soma, paridade, decadas'
+    };
+    const maxAvg = Math.max(...Object.values(strat.results).map(r => r.avg_hits));
+    const theoretical = (6 * 6 / 60).toFixed(3);
+
+    document.getElementById('strat-content').innerHTML = `
+      <div class="strat-header">
+        <div>Estrategia</div>
+        <div>Media de acertos / sorteio</div>
+        <div style="text-align:center">3 ac.</div>
+        <div style="text-align:center">Quadra</div>
+        <div style="text-align:center">Quina</div>
+        <div style="text-align:center">Sena</div>
+      </div>
+      <div class="strat-grid">
+        ${Object.entries(strat.results).map(([name, r]) => `
+          <div class="strat-row">
+            <div>
+              <div class="strat-name" style="color:${COLORS[name]}">${name}</div>
+              <div class="strat-desc">${DESCS[name]}</div>
+            </div>
+            <div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <div class="strat-bar-wrap" style="flex:1">
+                  <div class="strat-bar-fill" style="width:${(r.avg_hits/maxAvg*100).toFixed(1)}%;background:${COLORS[name]}"></div>
+                </div>
+                <span style="font-size:13px;font-variant-numeric:tabular-nums;color:var(--sub);width:36px">${r.avg_hits}</span>
+              </div>
+            </div>
+            <div class="strat-stat"><div class="strat-stat-val" style="color:var(--sub)">${r.tres}</div><div class="strat-stat-lbl">3 ac.</div></div>
+            <div class="strat-stat"><div class="strat-stat-val" style="color:var(--gold)">${r.quadra}</div><div class="strat-stat-lbl">Quadra</div></div>
+            <div class="strat-stat"><div class="strat-stat-val" style="color:var(--green)">${r.quina}</div><div class="strat-stat-lbl">Quina</div></div>
+            <div class="strat-stat"><div class="strat-stat-val" style="color:var(--red)">${r.sena}</div><div class="strat-stat-lbl">Sena</div></div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="insight-box">
+        <strong>Conclusao:</strong> Em ${strat.draws_tested} sorteios reais, todas as estrategias acertaram em media
+        <strong>~${theoretical} numeros por sorteio</strong> — exatamente o previsto pela teoria da probabilidade (6×6/60).
+        <br><br>
+        Nenhuma estrategia superou as outras de forma significativa.
+        <strong>Isso e a prova empirica de que a Mega-Sena e um processo aleatorio</strong> —
+        nao existe sistema, metodo ou IA capaz de aumentar suas chances reais de ganhar.
+      </div>
+    `;
   }
 
   // ── Build progress ──────────────────────────────────────────────

@@ -57,6 +57,74 @@ def build_dataset(df):
     return np.array(X), np.array(y), atrasos, contagem, hist_recente
 
 
+def generate_balanced_game(rng, attempts=800):
+    """
+    Gera um jogo balanceado com criterios estatisticos:
+      - Soma entre 110 e 230 (media historica: 183)
+      - 2 a 4 numeros pares
+      - No maximo 1 par consecutivo
+      - Pelo menos 3 decadas diferentes cobertas
+    """
+    for _ in range(attempts):
+        nums = sorted(rng.choice(range(1, 61), size=6, replace=False).tolist())
+        s      = sum(nums)
+        evens  = sum(1 for n in nums if n % 2 == 0)
+        consec = sum(1 for i in range(5) if nums[i + 1] - nums[i] == 1)
+        decades = len(set((n - 1) // 10 for n in nums))
+        if 110 <= s <= 230 and 2 <= evens <= 4 and consec <= 1 and decades >= 3:
+            return nums
+    return sorted(rng.choice(range(1, 61), size=6, replace=False).tolist())
+
+
+def compare_strategies(df, cols_bolas, n_test=500):
+    """
+    Simula 4 estrategias nos ultimos n_test sorteios e conta acertos reais.
+    Usa apenas dados historicos anteriores a cada sorteio (sem data leakage).
+
+    Estrategias:
+      - Aleatoria  : 6 numeros aleatorios
+      - Quentes    : os 6 numeros mais frequentes historicamente
+      - Frias      : os 6 numeros menos frequentes historicamente
+      - Balanceada : jogo com criterios estatisticos
+    """
+    N = len(df)
+    n_train = N - n_test
+
+    hist_nums = df.iloc[:n_train][cols_bolas].values.flatten()
+    freq = Counter(int(n) for n in hist_nums)
+    freq_sorted = sorted(range(1, 61), key=lambda n: -freq.get(n, 0))
+
+    hot_pick  = set(freq_sorted[:6])
+    cold_pick = set(freq_sorted[-6:])
+
+    counts      = {s: {3: 0, 4: 0, 5: 0, 6: 0} for s in ['Aleatoria', 'Quentes', 'Frias', 'Balanceada']}
+    total_hits  = {s: 0 for s in counts}
+    rng = np.random.RandomState(42)
+
+    for i in range(n_test):
+        actual = set(int(v) for v in df.iloc[n_train + i][cols_bolas].values)
+        random_pick   = set(rng.choice(range(1, 61), size=6, replace=False).tolist())
+        balanced_pick = set(generate_balanced_game(rng))
+
+        for name, pick in [('Aleatoria', random_pick), ('Quentes', hot_pick),
+                            ('Frias', cold_pick), ('Balanceada', balanced_pick)]:
+            m = len(actual & pick)
+            total_hits[name] += m
+            if m in counts[name]:
+                counts[name][m] += 1
+
+    results = {}
+    for name, c in counts.items():
+        results[name] = {
+            'tres':    c[3],
+            'quadra':  c[4],
+            'quina':   c[5],
+            'sena':    c[6],
+            'avg_hits': round(total_hits[name] / n_test, 3)
+        }
+    return results
+
+
 def main():
     print("Carregando dados...")
     df = pd.read_csv(ARQUIVO)
@@ -146,6 +214,32 @@ def main():
 
     todas.sort(key=lambda x: -x['score'])
 
+    # --- Combinacoes balanceadas ---
+    print("Gerando combinacoes balanceadas...")
+    balanced_combos = []
+    seen_b = set()
+    b_rng = np.random.RandomState(99)
+    while len(balanced_combos) < 10:
+        game = generate_balanced_game(b_rng)
+        key = tuple(game)
+        if key not in seen_b:
+            seen_b.add(key)
+            evens   = sum(1 for n in game if n % 2 == 0)
+            decades = len(set((n - 1) // 10 for n in game))
+            n_consec = sum(1 for i in range(5) if game[i + 1] - game[i] == 1)
+            balanced_combos.append({
+                "numbers": game,
+                "sum": sum(game),
+                "even": evens,
+                "odd": 6 - evens,
+                "decades": decades,
+                "consecutive": n_consec
+            })
+
+    # --- Comparacao de estrategias ---
+    print("Comparando estrategias (ultimos 500 sorteios)...")
+    strategies = compare_strategies(df, COLS_BOLAS)
+
     # --- Montar JSON final ---
     results = {
         "meta": {
@@ -177,6 +271,11 @@ def main():
             "train_draws": split,
             "test_draws": N - split,
             "feature_importance": feat_imp
+        },
+        "balanced_combinations": balanced_combos,
+        "strategies": {
+            "draws_tested": 500,
+            "results": strategies
         }
     }
 
