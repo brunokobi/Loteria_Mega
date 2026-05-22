@@ -380,6 +380,43 @@
     }
     footer strong { color: var(--sub); }
 
+    /* ── Build progress banner ──────────────────────────────────── */
+    .build-banner {
+      display: none;
+      position: fixed; top: 56px; left: 0; right: 0; z-index: 99;
+      background: var(--surf2);
+      border-bottom: 1px solid var(--border2);
+      padding: 0 24px;
+    }
+    .build-banner.show { display: block; }
+    .build-banner-inner {
+      max-width: 1180px; margin: 0 auto;
+      display: flex; align-items: center; gap: 14px;
+      height: 44px;
+    }
+    .build-pulse {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--gold); flex-shrink: 0;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.4; transform: scale(0.7); }
+    }
+    .build-bar-wrap {
+      flex: 1; height: 4px; background: var(--border);
+      border-radius: 2px; overflow: hidden;
+    }
+    .build-bar-fill {
+      height: 100%; border-radius: 2px;
+      background: linear-gradient(90deg, var(--gold), var(--green));
+      transition: width 1s linear;
+    }
+    .build-text { font-size: 13px; color: var(--sub); white-space: nowrap; }
+    .build-text strong { color: var(--text); font-variant-numeric: tabular-nums; }
+    .build-banner.done .build-pulse { background: var(--green); animation: none; }
+    .build-banner.done .build-bar-fill { width: 100% !important; background: var(--green); }
+
     /* ── Topbar ─────────────────────────────────────────────────── */
     .topbar {
       position: fixed; top: 0; left: 0; right: 0; z-index: 100;
@@ -425,6 +462,17 @@
     <div class="update-toast" id="update-toast"></div>
   </div>
 </nav>
+
+<!-- ── Build progress banner ─────────────────────────────────────── -->
+<div class="build-banner" id="build-banner">
+  <div class="build-banner-inner">
+    <div class="build-pulse" id="build-pulse"></div>
+    <div class="build-bar-wrap">
+      <div class="build-bar-fill" id="build-bar" style="width:0%"></div>
+    </div>
+    <div class="build-text" id="build-text">Iniciando build...</div>
+  </div>
+</div>
 
 <!-- ── Loading ──────────────────────────────────────────────────── -->
 <div id="loading">
@@ -697,6 +745,72 @@
     document.getElementById('app').classList.add('ready');
   }
 
+  // ── Build progress ──────────────────────────────────────────────
+  let currentGeneratedAt = null;
+  let pollTimer = null;
+  let elapsedTimer = null;
+  let elapsedSec = 0;
+  // Estimated build time ~180s; bar fills up to 95% before finishing
+  const BUILD_EST = 180;
+
+  function fmt(s) {
+    const m = Math.floor(s / 60), sec = s % 60;
+    return m > 0 ? `${m}m ${String(sec).padStart(2,'0')}s` : `${sec}s`;
+  }
+
+  function showBanner(text) {
+    document.getElementById('build-banner').className = 'build-banner show';
+    document.getElementById('build-text').innerHTML = text;
+  }
+
+  function startBuildProgress() {
+    elapsedSec = 0;
+    const banner = document.getElementById('build-banner');
+    const bar    = document.getElementById('build-bar');
+    banner.className = 'build-banner show';
+
+    elapsedTimer = setInterval(() => {
+      elapsedSec++;
+      const pct = Math.min(95, (elapsedSec / BUILD_EST) * 100).toFixed(1);
+      bar.style.width = pct + '%';
+      document.getElementById('build-text').innerHTML =
+        `Analisando historico e treinando modelo... <strong>${fmt(elapsedSec)}</strong>`;
+    }, 1000);
+
+    // Poll results.json a cada 15s para detectar quando o build terminar
+    pollTimer = setInterval(() => {
+      fetch('./results.json?t=' + Date.now())
+        .then(r => r.json())
+        .then(data => {
+          if (data.meta.generated_at !== currentGeneratedAt) {
+            buildFinished(data);
+          }
+        })
+        .catch(() => {}); // ignora erros durante o build
+    }, 15000);
+  }
+
+  function buildFinished(data) {
+    clearInterval(elapsedTimer);
+    clearInterval(pollTimer);
+
+    const banner = document.getElementById('build-banner');
+    const btn    = document.getElementById('update-btn');
+    banner.className = 'build-banner show done';
+    document.getElementById('build-text').innerHTML =
+      `Analise atualizada em <strong>${fmt(elapsedSec)}</strong>!`;
+
+    // Recarrega os dados na pagina
+    render(data);
+    currentGeneratedAt = data.meta.generated_at;
+    btn.disabled = false;
+    btn.querySelector('.btn-icon').textContent = '↻';
+    btn.classList.remove('loading');
+
+    // Oculta o banner apos 4s
+    setTimeout(() => { banner.className = 'build-banner'; }, 4000);
+  }
+
   // ── Trigger new build ───────────────────────────────────────────
   function triggerBuild() {
     const btn   = document.getElementById('update-btn');
@@ -704,7 +818,6 @@
 
     btn.disabled = true;
     btn.classList.add('loading');
-    btn.querySelector('.btn-icon').textContent = '↻';
     toast.className = 'update-toast';
     toast.textContent = '';
 
@@ -712,22 +825,19 @@
       .then(r => r.json())
       .then(data => {
         if (data.ok) {
-          toast.textContent = '✓ ' + data.message;
-          toast.className = 'update-toast ok show';
+          startBuildProgress();
         } else {
           toast.textContent = '✗ ' + (data.error || 'Erro desconhecido');
           toast.className = 'update-toast err show';
           btn.disabled = false;
+          btn.classList.remove('loading');
         }
       })
       .catch(() => {
         toast.textContent = '✗ Nao foi possivel conectar. Verifique se esta no Netlify.';
         toast.className = 'update-toast err show';
         btn.disabled = false;
-      })
-      .finally(() => {
         btn.classList.remove('loading');
-        btn.querySelector('.btn-icon').textContent = '↻';
       });
   }
 
@@ -737,7 +847,10 @@
       if (!r.ok) throw new Error('not found');
       return r.json();
     })
-    .then(render)
+    .then(data => {
+      currentGeneratedAt = data.meta.generated_at;
+      render(data);
+    })
     .catch(() => {
       document.getElementById('loading').innerHTML = `
         <div style="text-align:center;padding:40px;max-width:480px">
