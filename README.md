@@ -5,6 +5,9 @@
 ![Status](https://img.shields.io/badge/Status-Experimental-orange)
 ![License](https://img.shields.io/badge/License-Educational-lightgrey)
 ![Dataset](https://img.shields.io/badge/Dataset-Mega--Sena-brightgreen)
+[![Netlify](https://img.shields.io/badge/Deploy-Netlify-00C7B7?logo=netlify&logoColor=white)](https://loteriabruno.netlify.app)
+
+🌐 **[loteriabruno.netlify.app](https://loteriabruno.netlify.app)**
 
 Este repositório apresenta um **experimento educacional de Machine Learning** aplicado aos dados históricos da **Mega-Sena (loteria brasileira)**. O objetivo é **analisar padrões estatísticos** do histórico de sorteios e gerar **combinações de números com maior probabilidade relativa**, com base em um modelo treinado.
 
@@ -29,9 +32,14 @@ O script:
 
 ```bash
 .
-├── mega3.py                  # Script principal
-├── lottery-br-mega-sena.csv  # Dataset histórico da Mega-Sena
-└── README.md                 # Documentação do projeto
+├── mega3.py                        # Script CLI — análise completa no terminal
+├── generate_results.py             # Gera results.json para a interface web
+├── index.html                      # Interface web (dashboard)
+├── favicon.svg                     # Favicon da aplicação
+├── netlify.toml                    # Configuração de deploy (Netlify)
+├── requirements.txt                # Dependências Python
+├── lottery-br-mega-sena.csv        # Dataset histórico da Mega-Sena
+└── README.md                       # Documentação do projeto
 ```
 
 ---
@@ -76,12 +84,15 @@ Cada linha representa um sorteio histórico da Mega-Sena, contendo:
 
 ## 🧮 Engenharia de Features
 
-Para **cada número de 1 a 60**, em **cada sorteio**, são criadas as seguintes features:
+Para **cada número de 1 a 60**, em **cada sorteio**, são criadas as seguintes features (sem data leakage — estado computado antes do sorteio):
 
-| Feature    | Descrição                                                       |
-| ---------- | --------------------------------------------------------------- |
-| `atraso`   | Quantidade de sorteios desde a última vez que o número apareceu |
-| `paridade` | 1 se o número for par, 0 se ímpar                               |
+| Feature           | Descrição                                                       |
+| ----------------- | --------------------------------------------------------------- |
+| `atraso`          | Quantidade de sorteios desde a última vez que o número apareceu |
+| `paridade`        | 1 se o número for par, 0 se ímpar                               |
+| `freq_relativa`   | Frequência acumulada até o sorteio anterior                     |
+| `decada`          | Faixa do número: 0=1-10, 1=11-20, ... 5=51-60                  |
+| `freq_recente`    | Aparições nas últimas 20 jogadas                                |
 
 ### Variável Alvo (`y`)
 
@@ -115,18 +126,41 @@ GradientBoostingClassifier(
 
 ---
 
-## ▶️ Como Executar o Projeto
+## 🌐 Interface Web
+
+Acesse a aplicação em produção:
+
+**👉 [loteriabruno.netlify.app](https://loteriabruno.netlify.app)**
+
+A interface exibe:
+- Top 10 combinações com bolinhas animadas
+- Heatmap de frequência dos 60 números
+- Análise estatística (par/ímpar, décadas, soma)
+- Validação temporal com AUC-ROC
+- Botão **"Atualizar Análise"** para disparar novo build com barra de progresso em tempo real
+
+---
+
+## ▶️ Como Executar Localmente
 
 ### 1️⃣ Instalar Dependências
 
 ```bash
-pip install pandas numpy scikit-learn
+pip install -r requirements.txt
 ```
 
-### 2️⃣ Executar o Script
+### 2️⃣ Script CLI (terminal)
 
 ```bash
 python mega3.py
+```
+
+### 3️⃣ Gerar dados para a interface web
+
+```bash
+python generate_results.py
+# Abre index.html em um servidor local:
+python -m http.server 8080
 ```
 
 ---
@@ -144,22 +178,17 @@ python mega3.py
 
 ## 🧪 Limitações Conhecidas
 
-* Loterias são **processos estocásticos**
+* Loterias são **processos estocásticos** — cada sorteio é independente
 * O modelo **não prevê o futuro**, apenas explora padrões históricos
-* Não há validação tradicional (train/test), pois o objetivo é análise global
+* AUC-ROC ≈ 0.5 confirma que o modelo não supera o baseline aleatório
 
 ---
 
 ## 🚀 Possíveis Melhorias Futuras
 
-* Validação temporal (janela deslizante)
-* Inclusão de novas features:
-
-  * Frequência histórica
-  * Combinações pares/ímpares
-  * Soma dos números
 * Comparação com outros modelos (XGBoost, Random Forest, Redes Neurais)
-* Interface web ou dashboard
+* Validação com janela deslizante (walk-forward)
+* Atualização automática do dataset com novos sorteios
 
 ---
 
