@@ -100,6 +100,44 @@ Para cada jogo selecionado há três opções: simples (resultado mais provável
 
 Preço usado: **R$ 2,00 por combinação** (aposta mínima de R$ 4,00 com 1 duplo; máximo de 5 duplos e 3 triplos). Os valores vêm de notícias de 2026 e podem mudar: estão em `loteca/results.py::PRICING` e a página pede para conferir na Caixa.
 
+## Histórico das previsões
+
+`loteca/registry.py` mantém `loteca_registro.json`:
+
+1. **Registro:** para cada concurso aberto da programação, grava os 14 jogos com as probabilidades (odds quando o jogo tem, senão Elo), a fonte e o palpite (resultado mais provável). Só registra se todos os jogos tiverem previsão.
+2. **Atualização até o prazo:** enquanto as apostas estão abertas, a previsão é atualizada a cada execução (as odds mudam durante a semana); `first_registered_at` guarda o primeiro registro e `registered_at` a última atualização. **Depois do prazo, a previsão fica congelada.**
+3. **Conferência:** quando o concurso entra no `loteca.csv`, calcula acertos, % de acerto, log loss e Brier, e quantos acertos vieram de jogos com odds.
+
+### Como rodar
+
+A API da Caixa bloqueia servidores fora do Brasil (o build do Netlify e, ao que tudo indica, o GitHub Actions), então o registro roda numa máquina no Brasil:
+
+```bash
+# uma vez: chave da OddsPapi e caminho do Python num arquivo local (fora do repositório)
+mkdir -p ~/.config/loteca
+cat > ~/.config/loteca/env <<'CFG'
+ODDSPAPI_KEY=sua-chave
+PYTHON=/caminho/para/venv/bin/python
+CFG
+chmod 600 ~/.config/loteca/env
+
+# cada execução: atualiza o histórico, registra, confere, faz commit e push
+./scripts/registrar_loteca.sh
+```
+
+**Agendamento sugerido** (sexta à noite e sábado de manhã para registrar com as odds mais recentes; terça para conferir): 3 execuções por semana. Cada execução que publica algo gasta ~6 requisições da OddsPapi no script e ~6 no build do Netlify, ~150 por mês, dentro das 250 do plano grátis.
+
+* **Linux/WSL (cron):** `crontab -e` e
+  ```
+  0 20 * * 5   /home/bruno/Loteria_Mega/scripts/registrar_loteca.sh >> ~/loteca.log 2>&1
+  0 10 * * 6,2 /home/bruno/Loteria_Mega/scripts/registrar_loteca.sh >> ~/loteca.log 2>&1
+  ```
+  (no WSL, o cron só roda com o WSL aberto).
+* **Windows (Agendador de Tarefas):** ação `wsl.exe` com os argumentos
+  `-d Ubuntu-24.04 -- bash -lc "/home/bruno/Loteria_Mega/scripts/registrar_loteca.sh >> ~/loteca.log 2>&1"`.
+
+Se a máquina estiver desligada no horário, o concurso pode ficar sem registro antes do prazo; a conferência dos anteriores acontece na execução seguinte (e o navegador do visitante já confere sozinho os concursos jogados).
+
 ## Limites
 
 * Acertar mais jogos **não torna a aposta lucrativa**: a Caixa retém parte da arrecadação e o prêmio é dividido entre os ganhadores.

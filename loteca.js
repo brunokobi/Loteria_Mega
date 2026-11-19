@@ -347,6 +347,76 @@ function renderBacktest(d) {
 }
 
 
+// ── Histórico das previsões ──────────────────────────────────────
+function renderRegistry(reg) {
+  const box = document.getElementById('reg-content');
+  const rounds = reg?.rounds || [];
+  if (!rounds.length) {
+    box.innerHTML = `<p class="lt-empty">O registro começa com o próximo concurso. As previsões são gravadas antes do prazo das apostas e conferidas depois dos jogos.</p>`;
+    return;
+  }
+  const done = rounds.filter(r => r.result);
+  const pending = rounds.filter(r => !r.result);
+  const games = done.reduce((a, r) => a + r.result.games, 0);
+  const hits = done.reduce((a, r) => a + r.result.hits, 0);
+  let html = '';
+  if (done.length) {
+    html += `
+      <div class="lt-bet-summary lt-reg-summary">
+        <div class="lt-kpi"><span>${pct(hits / games)}</span>de acerto (${hits} de ${games} jogos)</div>
+        <div class="lt-kpi"><span>${(hits / done.length).toFixed(1).replace('.', ',')}</span>acertos por concurso</div>
+        <div class="lt-kpi"><span>${done.length}</span>concurso${done.length > 1 ? 's' : ''} conferido${done.length > 1 ? 's' : ''}</div>
+        <div class="lt-kpi"><span>33%</span>chute aleatório</div>
+      </div>`;
+  }
+  html += `
+    <div class="val-extra">
+      <table class="metric-table hist-table">
+        <caption class="sr-only">Previsões registradas da Loteca e acertos</caption>
+        <thead><tr><th scope="col">Concurso</th><th scope="col">Registrada em</th><th scope="col">Acertos</th><th scope="col">% de acerto</th><th scope="col">Jogos com odds</th></tr></thead>
+        <tbody>${rounds.map(r => {
+          const res = r.result;
+          const odds = r.games.filter(g => g.source === 'odds').length;
+          return `<tr>
+            <th scope="row">${esc(r.number)}<br><small>${esc(fmtDate(r.date))}${r.checked_in_browser ? ' · conferido agora' : ''}</small></th>
+            <td>${esc(fmtDate(r.first_registered_at))} ${esc((r.first_registered_at || '').slice(11))}${r.registered_at !== r.first_registered_at ? `<br><small>atualizada em ${esc(fmtDate(r.registered_at))} ${esc((r.registered_at || '').slice(11))}</small>` : ''}</td>
+            <td>${res ? `<strong>${res.hits}</strong> de ${res.games}` : '<small>aguardando os jogos</small>'}</td>
+            <td>${res ? pct(res.pct) : '—'}</td>
+            <td>${res ? `${res.hits_odds} de ${res.games_odds} certos` : `${odds} de ${r.games.length}`}</td></tr>`;
+        }).join('')}</tbody>
+      </table>
+      <div class="val-note">A previsão pode ser atualizada até o fim do prazo das apostas (as odds mudam durante a semana); depois disso fica congelada.
+        ${pending.length ? `Pendentes: ${pending.map(r => r.number).join(', ')}.` : ''}</div>
+    </div>`;
+  box.innerHTML = html;
+}
+
+// Confere no navegador concursos registrados que já têm resultado na Caixa
+function checkRegistryInBrowser(reg) {
+  const today = new Date().toISOString().slice(0, 10);
+  const pending = (reg?.rounds || []).filter(r => !r.result && r.games.every(g => (g.date || '') < today));
+  pending.slice(0, 3).forEach(r => {
+    fetch(`https://servicebus2.caixa.gov.br/portaldeloterias/api/loteca/${r.number}`, { headers: { Accept: 'application/json' } })
+      .then(x => (x.ok ? x.json() : Promise.reject()))
+      .then(d => {
+        const list = d.listaResultadoEquipeEsportiva || [];
+        if (Number(d.numero) !== Number(r.number) || !list.length) return;
+        const outcome = new Map(list.map(g => [g.nuSequencial,
+          g.nuGolEquipeUm > g.nuGolEquipeDois ? '1' : g.nuGolEquipeUm === g.nuGolEquipeDois ? 'X' : '2']));
+        const scored = r.games.filter(g => outcome.has(g.seq));
+        if (!scored.length) return;
+        scored.forEach(g => { g.outcome = outcome.get(g.seq); g.hit = g.pick === g.outcome; });
+        const hits = scored.filter(g => g.hit).length;
+        const withOdds = scored.filter(g => g.source === 'odds');
+        r.result = { games: scored.length, hits, pct: hits / scored.length,
+          hits_odds: withOdds.filter(g => g.hit).length, games_odds: withOdds.length };
+        r.checked_in_browser = true;
+        renderRegistry(reg);
+      })
+      .catch(() => { /* resultado ainda não publicado */ });
+  });
+}
+
 // ── Inicialização ────────────────────────────────────────────────
 function applyRounds(rounds) {
   state.rounds = rounds || [];
@@ -379,6 +449,10 @@ function init(d) {
   applyRounds(d.rounds || []);
   renderBacktest(d);
   refreshFromCaixa();
+  fetch('./loteca_registro.json')
+    .then(r => (r.ok ? r.json() : null))
+    .catch(() => null)
+    .then(reg => { renderRegistry(reg); checkRegistryInBrowser(reg); });
 
   const tabs = document.getElementById('round-tabs');
   tabs.addEventListener('click', e => { const b = e.target.closest('.lt-tab'); if (b) selectRound(+b.dataset.i); });

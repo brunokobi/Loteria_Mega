@@ -54,8 +54,11 @@ O pipeline:
 │   ├── matching.py                 #   casa jogos da Caixa com o football-data
 │   ├── backtest.py                 #   teste no passado (Elo, odds, combinação)
 │   ├── live.py                     #   jogos da semana com odds da OddsPapi
+│   ├── registry.py                 #   registro das previsões e conferência
 │   └── results.py                  #   monta o loteca.json
 ├── docs/loteca.md                  # Metodologia e resultados da Loteca
+├── loteca_registro.json            # Previsões registradas da Loteca e conferência
+├── scripts/registrar_loteca.sh     # Registro/conferência da Loteca (rodar no Brasil)
 ├── tests/                          # Testes (pytest)
 ├── update_dataset.py               # Atualiza o CSV da Mega-Sena com os concursos recentes
 ├── mega3.py                        # CLI — análise completa da Mega-Sena no terminal
@@ -201,6 +204,12 @@ A interface exibe:
 **Acessibilidade:** contraste de texto WCAG AA, landmarks e link para pular ao conteúdo, foco visível, heatmap navegável por teclado (setas) e por toque, textos alternativos para os jogos e gráficos, e respeito à preferência do sistema por menos movimento (sem animações nem física no hero). A auditoria com axe-core (regras WCAG 2 A/AA e boas práticas) não aponta violações.
 
 A página **Loteca** (`loteca.html`) tem os 14 jogos de cada concurso aberto (em abas), o montador de aposta e o teste no histórico, com a mesma base de acessibilidade. Como a Caixa bloqueia o build, **o navegador busca a programação direto** e monta os jogos com o Elo e as odds publicados no build.
+
+### Histórico das previsões da Loteca
+
+Antes do prazo das apostas, as probabilidades e o palpite (resultado mais provável) de cada um dos 14 jogos são gravados em `loteca_registro.json`. A previsão pode ser atualizada até o fim do prazo, porque as odds mudam durante a semana, e depois fica congelada. Quando os resultados entram no `loteca.csv`, o registro confere acertos, **% de acerto**, log loss e Brier de cada concurso. A página mostra a tabela e o resumo (% de acerto geral, acertos por concurso, comparação com os 33% do chute). O navegador também confere concursos já jogados que o registro ainda não conferiu.
+
+Como a Caixa bloqueia servidores fora do Brasil, o registro roda numa máquina no Brasil com `scripts/registrar_loteca.sh`: atualiza o histórico, registra, confere, faz commit e push (o Netlify publica). Detalhes e agendamento em [docs/loteca.md](docs/loteca.md#histórico-das-previsões).
 
 > **Limitação da Loteca:** o espelho comunitário não tem a Loteca, então o build não consegue baixar concursos novos para o histórico (`loteca.csv`) e o Elo só avança quando alguém roda a atualização numa máquina no Brasil: `python -m loteca.update` e push. A página continua funcionando com os jogos e as odds da semana.
 

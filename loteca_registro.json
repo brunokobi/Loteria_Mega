@@ -1,0 +1,390 @@
+{
+ "rounds": [
+  {
+   "number": 1285,
+   "date": "2026-11-28",
+   "deadline": "2026-11-28 16:00",
+   "registered_at": "2026-11-19 15:32",
+   "first_registered_at": "2026-11-19 15:32",
+   "games": [
+    {
+     "seq": 1,
+     "home": "PALMEIRAS",
+     "away": "ESTUDIANTES",
+     "date": "2026-11-28",
+     "probs": [
+      0.5005,
+      0.2914,
+      0.2081
+     ],
+     "source": "odds",
+     "pick": "1"
+    },
+    {
+     "seq": 2,
+     "home": "REAL MADRID",
+     "away": "DEPORTIVO ALAVES",
+     "date": "2026-11-28",
+     "probs": [
+      0.8273,
+      0.1069,
+      0.0658
+     ],
+     "source": "odds",
+     "pick": "1"
+    },
+    {
+     "seq": 3,
+     "home": "BOTAFOGO",
+     "away": "BAHIA",
+     "date": "2026-11-28",
+     "probs": [
+      0.4401,
+      0.2821,
+      0.2778
+     ],
+     "source": "elo",
+     "pick": "1"
+    },
+    {
+     "seq": 4,
+     "home": "EVERTON",
+     "away": "LIVERPOOL",
+     "date": "2026-11-29",
+     "probs": [
+      0.2711,
+      0.2658,
+      0.4632
+     ],
+     "source": "odds",
+     "pick": "2"
+    },
+    {
+     "seq": 5,
+     "home": "CELTA DE VIGO",
+     "away": "VILLARREAL",
+     "date": "2026-11-29",
+     "probs": [
+      0.3566,
+      0.273,
+      0.3704
+     ],
+     "source": "odds",
+     "pick": "2"
+    },
+    {
+     "seq": 6,
+     "home": "VALENCIA CLUB",
+     "away": "OSASUNA",
+     "date": "2026-11-29",
+     "probs": [
+      0.4482,
+      0.2858,
+      0.2659
+     ],
+     "source": "odds",
+     "pick": "1"
+    },
+    {
+     "seq": 7,
+     "home": "CORITIBA",
+     "away": "FLAMENGO",
+     "date": "2026-11-29",
+     "probs": [
+      0.1713,
+      0.2621,
+      0.5666
+     ],
+     "source": "elo",
+     "pick": "2"
+    },
+    {
+     "seq": 8,
+     "home": "VITORIA",
+     "away": "SANTOS",
+     "date": "2026-11-29",
+     "probs": [
+      0.371,
+      0.2892,
+      0.3398
+     ],
+     "source": "elo",
+     "pick": "1"
+    },
+    {
+     "seq": 9,
+     "home": "ARSENAL",
+     "away": "MANCHESTER CITY",
+     "date": "2026-11-29",
+     "probs": [
+      0.4628,
+      0.2535,
+      0.2837
+     ],
+     "source": "odds",
+     "pick": "1"
+    },
+    {
+     "seq": 10,
+     "home": "CORINTHIANS",
+     "away": "GREMIO",
+     "date": "2026-11-29",
+     "probs": [
+      0.5003,
+      0.2709,
+      0.2289
+     ],
+     "source": "elo",
+     "pick": "1"
+    },
+    {
+     "seq": 11,
+     "home": "MIRASSOL",
+     "away": "ATHLETICO",
+     "date": "2026-11-29",
+     "probs": [
+      0.4435,
+      0.2816,
+      0.2749
+     ],
+     "source": "elo",
+     "pick": "1"
+    },
+    {
+     "seq": 12,
+     "home": "INTERNACIONAL",
+     "away": "BRAGANTINO",
+     "date": "2026-11-29",
+     "probs": [
+      0.5119,
+      0.2682,
+      0.22
+     ],
+     "source": "elo",
+     "pick": "1"
+    },
+    {
+     "seq": 13,
+     "home": "ATLETICO",
+     "away": "VASCO DA GAMA",
+     "date": "2026-11-29",
+     "probs": [
+      0.4959,
+      0.2718,
+      0.2322
+     ],
+     "source": "elo",
+     "pick": "1"
+    },
+    {
+     "seq": 14,
+     "home": "REAL SOCIEDAD",
+     "away": "SEVILLA",
+     "date": "2026-11-29",
+     "probs": [
+      0.4588,
+      0.2511,
+      0.2901
+     ],
+     "source": "odds",
+     "pick": "1"
+    }
+   ],
+   "result": null
+  },
+  {
+   "number": 1284,
+   "date": "2026-11-21",
+   "deadline": "2026-11-21 15:00",
+   "registered_at": "2026-11-19 15:32",
+   "first_registered_at": "2026-11-19 15:32",
+   "games": [
+    {
+     "seq": 1,
+     "home": "PALMEIRAS",
+     "away": "FLAMENGO",
+     "date": "2026-11-21",
+     "probs": [
+      0.2566,
+      0.2636,
+      0.4798
+     ],
+     "source": "odds",
+     "pick": "2"
+    },
+    {
+     "seq": 2,
+     "home": "ATHLETICO",
+     "away": "REMO",
+     "date": "2026-11-22",
+     "probs": [
+      0.6495,
+      0.2039,
+      0.1466
+     ],
+     "source": "odds",
+     "pick": "1"
+    },
+    {
+     "seq": 3,
+     "home": "BAHIA",
+     "away": "CORITIBA",
+     "date": "2026-11-21",
+     "probs": [
+      0.6342,
+      0.2048,
+      0.161
+     ],
+     "source": "odds",
+     "pick": "1"
+    },
+    {
+     "seq": 4,
+     "home": "ATLETICO",
+     "away": "BOCA JUNIORS",
+     "date": "2026-11-21",
+     "probs": [
+      0.2623,
+      0.3176,
+      0.4201
+     ],
+     "source": "odds",
+     "pick": "2"
+    },
+    {
+     "seq": 5,
+     "home": "CHAPECOENSE",
+     "away": "CRUZEIRO",
+     "date": "2026-11-21",
+     "probs": [
+      0.1444,
+      0.1981,
+      0.6575
+     ],
+     "source": "odds",
+     "pick": "2"
+    },
+    {
+     "seq": 6,
+     "home": "REAL MADRID",
+     "away": "CELTA DE VIGO",
+     "date": "2026-11-21",
+     "probs": [
+      0.8282,
+      0.1192,
+      0.0526
+     ],
+     "source": "odds",
+     "pick": "1"
+    },
+    {
+     "seq": 7,
+     "home": "JUVENTUS",
+     "away": "VENEZIA",
+     "date": "2026-11-22",
+     "probs": [
+      0.7091,
+      0.1762,
+      0.1147
+     ],
+     "source": "odds",
+     "pick": "1"
+    },
+    {
+     "seq": 8,
+     "home": "BARCELONA",
+     "away": "VILLARREAL",
+     "date": "2026-11-22",
+     "probs": [
+      0.7931,
+      0.1354,
+      0.0716
+     ],
+     "source": "odds",
+     "pick": "1"
+    },
+    {
+     "seq": 9,
+     "home": "LIVERPOOL",
+     "away": "MANCHESTER UNITED",
+     "date": "2026-11-22",
+     "probs": [
+      0.5437,
+      0.2263,
+      0.23
+     ],
+     "source": "odds",
+     "pick": "1"
+    },
+    {
+     "seq": 10,
+     "home": "FLUMINENSE",
+     "away": "MIRASSOL",
+     "date": "2026-11-22",
+     "probs": [
+      0.5299,
+      0.2637,
+      0.2064
+     ],
+     "source": "elo",
+     "pick": "1"
+    },
+    {
+     "seq": 11,
+     "home": "BRAGANTINO",
+     "away": "VASCO DA GAMA",
+     "date": "2026-11-22",
+     "probs": [
+      0.4977,
+      0.2714,
+      0.2308
+     ],
+     "source": "elo",
+     "pick": "1"
+    },
+    {
+     "seq": 12,
+     "home": "OSASUNA",
+     "away": "MALAGA",
+     "date": "2026-11-22",
+     "probs": [
+      0.5222,
+      0.2645,
+      0.2133
+     ],
+     "source": "odds",
+     "pick": "1"
+    },
+    {
+     "seq": 13,
+     "home": "ATALANTA BERGAMAS",
+     "away": "INTER DE MILAO",
+     "date": "2026-11-22",
+     "probs": [
+      0.1957,
+      0.2093,
+      0.595
+     ],
+     "source": "odds",
+     "pick": "2"
+    },
+    {
+     "seq": 14,
+     "home": "GETAFE",
+     "away": "ATLETICO MADRID",
+     "date": "2026-11-22",
+     "probs": [
+      0.1546,
+      0.234,
+      0.6113
+     ],
+     "source": "odds",
+     "pick": "2"
+    }
+   ],
+   "result": null
+  }
+ ],
+ "summary": null,
+ "updated_at": "2026-11-19 15:32"
+}

@@ -770,3 +770,4 @@ a.topbar-logo { text-decoration: none; }
 .lt-teams small { color: var(--muted); font-weight: 600; font-size: 11px; }
 .lt-round-note { list-style: none; margin-top: 6px; }
 @media (max-width: 760px) { .lt-game-round { grid-template-columns: 32px minmax(0, 1fr); } }
+.lt-reg-summary { margin-bottom: 16px; }
