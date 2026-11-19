@@ -1,6 +1,13 @@
-"""Atualizacao do CSV com os concursos mais recentes (API publica da Caixa)."""
+"""
+Atualizacao do CSV com os concursos mais recentes.
+
+Fonte principal: API publica da Caixa. Ela bloqueia servidores fora do Brasil (HTTP 403
+no build do Netlify), entao, se falhar, usa o espelho comunitario loteriascaixa-api
+(github.com/guto-alves/loterias-api), convertido para o mesmo formato e validado igual.
+"""
 import json
 import time
+import urllib.error
 import urllib.request
 from datetime import datetime
 
@@ -14,18 +21,47 @@ class DrawDataError(ValueError):
     """Resposta da API com dados invalidos."""
 
 
-def fetch_draw(number=None, timeout=15, retries=3):
-    """JSON de um concurso (ou do ultimo, se number=None), com novas tentativas."""
-    url = API_URL + ('' if number is None else str(number))
+MIRROR_URL = 'https://loteriascaixa-api.herokuapp.com/api/megasena/'
+
+
+def _get_json(url, timeout, retries):
     for attempt in range(retries):
         try:
             req = urllib.request.Request(url, headers=HEADERS)
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 return json.load(resp)
+        except urllib.error.HTTPError as exc:
+            if exc.code in (403, 404) or attempt == retries - 1:
+                raise  # bloqueio ou concurso inexistente: nao adianta repetir
+            time.sleep(2 ** attempt)
         except Exception:
             if attempt == retries - 1:
                 raise
             time.sleep(2 ** attempt)
+
+
+def mirror_to_caixa(data):
+    """Formato do espelho -> formato da API da Caixa (so os campos usados aqui)."""
+    return {
+        'numero': data['concurso'],
+        'dataApuracao': data['data'],
+        'listaDezenas': data['dezenas'],
+        'numeroConcursoProximo': data.get('proximoConcurso'),
+        'dataProximoConcurso': data.get('dataProximoConcurso'),
+        'fonte': 'espelho',
+    }
+
+
+def fetch_draw(number=None, timeout=15, retries=3):
+    """JSON de um concurso (ou do ultimo, se number=None): Caixa e, se falhar, o espelho."""
+    suffix = '' if number is None else str(number)
+    try:
+        return _get_json(API_URL + suffix, timeout, retries)
+    except Exception as caixa_exc:
+        try:
+            return mirror_to_caixa(_get_json(MIRROR_URL + (suffix or 'latest'), timeout, retries))
+        except Exception:
+            raise caixa_exc from None
 
 
 def parse_draw(data, expected_number=None):

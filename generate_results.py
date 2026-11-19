@@ -36,7 +36,7 @@ def main():
     status = _read_status()
     last_number = int(df['DrawNumber'].max())
     results['meta']['next_draw'] = next_draw_info(last_number, results['meta']['date_end'], status)
-    keys = ('status', 'added', 'checked_at', 'messages')
+    keys = ('status', 'added', 'checked_at', 'source', 'messages')
     results['meta']['data_update'] = {k: status.get(k) for k in keys} if status else None
 
     with open(OUTPUT, 'w', encoding='utf-8') as f:

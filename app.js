@@ -737,7 +737,31 @@ const ballsHtml = (nums, hitSet) => nums.map(n =>
 function loadHistory() {
   const getJson = url => fetch(url).then(r => (r.ok ? r.json() : null)).catch(() => null);
   Promise.all([getJson('./predicoes.json'), getJson('./mega_historico_retro.json')])
-    .then(([log, retro]) => renderHistory(log, retro));
+    .then(([log, retro]) => {
+      renderHistory(log, retro);
+      checkPendingInBrowser(log, retro);
+    });
+}
+
+// Confere no navegador a previsão pendente assim que a Caixa publica o resultado
+// (o build pode demorar a ver o resultado novo).
+function checkPendingInBrowser(log, retro) {
+  const pending = (log?.entries || []).find(e => !e.hits);
+  if (!pending) return;
+  fetch(`https://servicebus2.caixa.gov.br/portaldeloterias/api/megasena/${pending.concurso}`, { headers: { Accept: 'application/json' } })
+    .then(r => (r.ok ? r.json() : Promise.reject()))
+    .then(d => {
+      const result = (d.listaDezenas || []).map(Number).sort((a, b) => a - b);
+      if (Number(d.numero) !== Number(pending.concurso) || result.length !== 6) return;
+      const set = new Set(result);
+      pending.result = result;
+      pending.date = (d.dataApuracao || '').split('/').reverse().join('-');
+      pending.hits = pending.combinations.map(c => c.filter(n => set.has(n)).length);
+      pending.best = Math.max(...pending.hits);
+      pending.checked_in_browser = true;
+      renderHistory(log, retro);
+    })
+    .catch(() => { /* resultado ainda não saiu */ });
 }
 
 function renderHistory(log, retro) {
@@ -763,7 +787,7 @@ function renderHistory(log, retro) {
           const bestIdx = e.hits.indexOf(e.best);
           const prize = e.hits.filter(h => h >= 3).length;
           return `<tr>
-            <th scope="row">${escHtml(e.concurso)}<br><small>${escHtml(fmtDate(e.date))}</small></th>
+            <th scope="row">${escHtml(e.concurso)}<br><small>${escHtml(fmtDate(e.date))}${e.checked_in_browser ? ' · conferido agora' : ''}</small></th>
             <td><div class="mini-balls">${ballsHtml(e.result)}</div></td>
             <td><div class="mini-balls">${ballsHtml(e.combinations[bestIdx], res)}</div><small>${e.best} acerto${e.best === 1 ? '' : 's'}${HIT_LABEL[e.best] ? ` · ${HIT_LABEL[e.best]}` : ''}</small></td>
             <td>${prize}</td></tr>`;

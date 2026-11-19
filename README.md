@@ -84,7 +84,9 @@ O pipeline:
 
 ### Atualização automática
 
-`update_dataset.py` consulta o último concurso na API, baixa os que faltam no CSV, valida cada um (6 dezenas únicas entre 1 e 60, número do concurso esperado) e acrescenta ao arquivo. O build do Netlify roda esse script antes da análise, então **cada build usa os sorteios mais recentes**. Se a API estiver fora do ar, o CSV atual é mantido e o build segue normalmente.
+`update_dataset.py` consulta o último concurso, baixa os que faltam no CSV, valida cada um (6 dezenas únicas entre 1 e 60, número do concurso esperado) e acrescenta ao arquivo. O build do Netlify roda esse script antes da análise, então **cada build usa os sorteios mais recentes**.
+
+> **A API da Caixa bloqueia servidores fora do Brasil** (HTTP 403 no build do Netlify, confirmado em novembro de 2026). Por isso a atualização usa, como reserva, o espelho comunitário [loteriascaixa-api](https://github.com/guto-alves/loterias-api) (hospedado no Heroku), convertido para o formato da Caixa e validado do mesmo jeito. Se as duas fontes falharem, o CSV atual é mantido e o build segue normalmente. O resultado da tentativa (`status`, `source`: `caixa` ou `espelho`, mensagens) fica em `results.json → meta.data_update`.
 
 Cada linha tem `DrawDate` (data do sorteio) e `Ball1` a `Ball6` (números sorteados, 1 a 60). Os dados são ordenados por `DrawDate`.
 
@@ -143,7 +145,9 @@ Para regenerar o teste retroativo (~2 minutos): `python -m megasena.history`.
 
 ### Próximo sorteio
 
-O site sempre mostra o número e a data do próximo concurso. A data vem da API da Caixa: o navegador consulta direto (a API permite CORS) e o build grava o que conseguiu em `results.json`. Se a Caixa não responder, a data é estimada pelo calendário (terça, quinta e sábado) e aparece marcada como estimada. O build também grava em `meta.data_update` se conseguiu atualizar os sorteios, para diagnóstico.
+O site sempre mostra o número e a data do próximo concurso. O **navegador de quem visita consulta a Caixa direto** (a API permite CORS e o visitante está no Brasil), então a data fica certa mesmo com o build bloqueado. O build grava a data que conseguiu (Caixa ou espelho) em `results.json`; se nenhuma fonte responder, a data é estimada pelo calendário (terça, quinta e sábado) e aparece marcada como estimada.
+
+O navegador também **confere a previsão pendente** assim que a Caixa publica o resultado, sem esperar o próximo build (aparece como "conferido agora").
 
 ---
 
@@ -196,7 +200,9 @@ A interface exibe:
 
 **Acessibilidade:** contraste de texto WCAG AA, landmarks e link para pular ao conteúdo, foco visível, heatmap navegável por teclado (setas) e por toque, textos alternativos para os jogos e gráficos, e respeito à preferência do sistema por menos movimento (sem animações nem física no hero). A auditoria com axe-core (regras WCAG 2 A/AA e boas práticas) não aponta violações.
 
-A página **Loteca** (`loteca.html`) tem os 14 jogos de cada concurso aberto (em abas), o montador de aposta e o teste no histórico, com a mesma base de acessibilidade. Se o build não conseguir a programação na Caixa, o navegador busca direto e monta os jogos com o Elo e as odds publicados no build.
+A página **Loteca** (`loteca.html`) tem os 14 jogos de cada concurso aberto (em abas), o montador de aposta e o teste no histórico, com a mesma base de acessibilidade. Como a Caixa bloqueia o build, **o navegador busca a programação direto** e monta os jogos com o Elo e as odds publicados no build.
+
+> **Limitação da Loteca:** o espelho comunitário não tem a Loteca, então o build não consegue baixar concursos novos para o histórico (`loteca.csv`) e o Elo só avança quando alguém roda a atualização numa máquina no Brasil: `python -m loteca.update` e push. A página continua funcionando com os jogos e as odds da semana.
 
 O build roda `update_dataset.py`, `generate_results.py` e `generate_loteca.py`, e leva cerca de 2 a 3 minutos.
 
@@ -275,7 +281,8 @@ O `score` é a média das probabilidades estimadas pelo modelo para os 6 número
 
 ## 🚀 Possíveis Melhorias Futuras
 
-* Build agendado após cada sorteio (quartas e sábados)
+* Build agendado após cada sorteio (terças, quintas e sábados)
+* Atualização da Loteca a partir de uma máquina no Brasil (a Caixa bloqueia servidores de fora)
 * Proteger o botão "Atualizar Análise" contra builds em excesso
 * Loteca: guardar as odds de cada semana para formar um histórico próprio dos estaduais e da Série B
 * Comparação com outros modelos (XGBoost, Random Forest, Redes Neurais)

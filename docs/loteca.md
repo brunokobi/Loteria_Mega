@@ -19,6 +19,13 @@ Ordem das fontes para a programação:
 2. se a Caixa não responder no build, usa a programação publicada no deploy anterior (se as apostas ainda estiverem abertas);
 3. o navegador também consulta a Caixa (a API permite CORS) e, se o concurso for diferente do publicado, monta os jogos sozinho com as tabelas de times (`team_lookup`), o Elo e as odds do `loteca.json`.
 
+### Bloqueio da Caixa fora do Brasil
+
+A API da Caixa responde **HTTP 403** para servidores fora do Brasil, como os do build do Netlify (confirmado em novembro de 2026). Efeitos na Loteca:
+
+* **Programação e data do concurso:** o navegador do visitante consulta a Caixa direto, então a página mostra os 14 jogos certos.
+* **Histórico (`loteca.csv`) e Elo:** não há espelho público da Loteca, então o build não baixa concursos novos. Para atualizar, rode numa máquina no Brasil `python -m loteca.update` e faça push; o próximo build recalcula o Elo e o teste.
+
 ### Problemas conhecidos nos dados da Caixa
 
 * Jogos com resultado **sorteado** (partida não realizada) vêm sem data; usamos a data de apuração e esses jogos **não atualizam o Elo**.

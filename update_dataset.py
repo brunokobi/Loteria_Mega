@@ -27,19 +27,21 @@ def main():
     failed = any(m.startswith('Aviso') for m in messages)
     status = 'falha' if failed and not added else 'ok' if added else 'sem_novos'
 
-    next_draw = None
-    try:  # data do proximo sorteio informada pela Caixa
+    next_draw, source = None, None
+    try:  # data do proximo sorteio (Caixa ou, se bloqueada, o espelho)
         latest = fetch_draw(None)
+        source = latest.get('fonte', 'caixa')
         next_draw = {'number': latest.get('numeroConcursoProximo'),
                      'date': latest.get('dataProximoConcurso')}
     except Exception as exc:
-        log(f"Aviso: proximo sorteio indisponivel na Caixa ({exc}); sera estimado.")
+        log(f"Aviso: proximo sorteio indisponivel ({exc}); sera estimado.")
 
     STATUS_FILE.write_text(json.dumps({
         'status': status,
         'added': added,
         'checked_at': datetime.now(ZoneInfo('America/Sao_Paulo')).strftime('%Y-%m-%d %H:%M'),
         'next_draw': next_draw,
+        'source': source,
         'messages': messages[-3:],
     }, ensure_ascii=False), encoding='utf-8')
 
