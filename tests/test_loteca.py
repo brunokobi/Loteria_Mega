@@ -175,3 +175,53 @@ def test_match_games_requires_same_score_and_date():
     assert m.loc[0, 'odds_p1'] == 0.4 and m.loc[0, 'odds_league'] == 'E0'
     assert np.isnan(m.loc[1, 'odds_p1'])  # placar nao bate
     assert np.isnan(m.loc[2, 'odds_p1'])  # sem odds para estadual
+
+
+# ── odds da semana (OddsPapi) ───────────────────────────────────────
+from loteca import live  # noqa: E402
+
+
+def test_split_name_and_match_team():
+    assert live.split_name('CR Flamengo RJ', 'BRA') == ('CR FLAMENGO', 'RJ')
+    assert live.split_name('Arsenal FC', 'ING') == ('ARSENAL FC', 'ING')
+    ratings = {'FLAMENGO/RJ': 1600, 'FLAMENGO B/RJ': 1400, 'VASCO DA GAMA/RJ': 1550,
+               'CORINTHIANS/SP': 1580, 'CORINTHIANS B/SP': 1450, 'ARSENAL/ING': 1700}
+    index = live.build_team_index(ratings)
+    assert live.match_team('CR Flamengo RJ', 'BRA', index) == 'FLAMENGO/RJ'
+    assert live.match_team('CR Vasco da Gama RJ', 'BRA', index) == 'VASCO DA GAMA/RJ'
+    assert live.match_team('SC Corinthians SP', 'BRA', index) == 'CORINTHIANS/SP'
+    assert live.match_team('Arsenal FC', 'ING', index) == 'ARSENAL/ING'
+    assert live.match_team('Chelsea FC', 'ING', index) is None
+
+
+def test_probs_from_market():
+    def out(price):
+        return {'players': {'0': {'price': price}}}
+    market = {'outcomes': {'101': out(2.0), '102': out(3.5), '103': out(4.0)}}
+    p = live._probs_from_market(market)
+    assert sum(p) == pytest.approx(1, abs=1e-3) and p[0] > p[2]
+    assert live._probs_from_market({'outcomes': {'101': out(2.0)}}) is None
+
+
+def test_fetch_upcoming_without_key_returns_empty(monkeypatch):
+    monkeypatch.delenv('ODDSPAPI_KEY', raising=False)
+    assert live.fetch_upcoming({}, log=lambda *_: None) == []
+
+
+def test_fetch_upcoming_api_error_returns_empty(monkeypatch):
+    def boom(*a, **k):
+        raise OSError('offline')
+    monkeypatch.setattr(live, '_get', boom)
+    assert live.fetch_upcoming({}, key='x', log=lambda *_: None) == []
+
+
+def test_merge_name_variants():
+    from loteca.data import merge_name_variants
+    df = pd.DataFrame({
+        'concurso': [1, 2, 3, 3],
+        'home': ['VASCO/RJ', 'VASCO DA GAMA/RJ', 'PORTUGUESA/SP', 'PORTUGUESA SANTIS/SP'],
+        'away': ['X/RJ', 'Y/RJ', 'Z/SP', 'W/SP'],
+    })
+    canon = merge_name_variants(df)
+    assert canon['VASCO/RJ'] == canon['VASCO DA GAMA/RJ']  # nunca no mesmo concurso
+    assert canon['PORTUGUESA/SP'] != canon['PORTUGUESA SANTIS/SP']  # clubes diferentes

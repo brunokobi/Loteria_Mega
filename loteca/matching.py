@@ -23,7 +23,15 @@ COUNTRY = {'ING': 'ING', 'ITA': 'ITA', 'ESP': 'ESP', 'FRA': 'FRA', 'DEU': 'DEU',
 STOPWORDS = {
     'FC', 'CF', 'AC', 'SC', 'EC', 'CA', 'CD', 'UD', 'SD', 'RCD', 'AFC', 'SE', 'US', 'AS', 'SS',
     'OGC', 'RC', 'CLUBE', 'CLUB', 'DE', 'DA', 'DO', 'DI', 'THE', 'CALCIO', 'FUTEBOL', 'FOOTBALL',
+    'CR', 'FB', 'AA', 'SER', 'SAD', 'FK', 'SK', 'SV', 'VFB', 'VFL', 'TSG', 'KV', 'BK', 'IF',
 } | BR_STATES
+
+# palavras comuns a muitos clubes: nao bastam para dizer que dois nomes sao o mesmo time
+GENERIC_SHARED = {
+    'UNITED', 'CITY', 'TOWN', 'REAL', 'ATLETICO', 'ATHLETIC', 'SPORTING', 'SPORT', 'INTER',
+    'RACING', 'DEPORTIVO', 'OLYMPIQUE', 'AMERICA', 'UNION', 'COUNTY', 'ROVERS', 'WANDERERS',
+    'ALBION', 'BORUSSIA', 'NACIONAL', 'INDEPENDIENTE', 'ESPORTE', 'CLUBE', 'SANTA', 'SAO',
+}
 
 # grafia da Caixa (normalizada) -> grafia do football-data (normalizada)
 ALIASES = {
@@ -49,9 +57,17 @@ ALIASES = {
     'PSV EINDHOVEN': 'PSV EINDHOVEN',
     'VASCO DA GAMA': 'VASCO', 'S PAULO': 'SAO PAULO', 'SAO PAULO': 'SAO PAULO',
     'ATHLETICO': 'ATHLETICO PR', 'ATLETICO PR': 'ATHLETICO PR',
-    'ATLETICO PARANAENSE': 'ATHLETICO PR',
-    'ATLETICO': 'ATLETICO MG', 'ATLETICO MINEIRO': 'ATLETICO MG',
+    'ATLETICO PARANAENSE': 'ATHLETICO PR', 'CA PARANAENSE': 'ATHLETICO PR',
+    'ATLETICO MINEIRO': 'ATLETICO MG',
     'BRAGANTINO': 'BRAGANTINO', 'RED BULL BRAGANTINO': 'BRAGANTINO',
+    # grafias da OddsPapi (ja sem a UF final)
+    'CR VASCO DA GAMA': 'VASCO', 'F VASCO DA GAMA': 'VASCO',
+    'GREMIO FB PORTO ALEGRENSE': 'GREMIO', 'AC GOIANIENSE': 'ATLETICO GOIANIENSE',
+    'LAZIO ROME': 'LAZIO', 'SOCIETA SPO LAZIO': 'LAZIO', 'SS LAZIO': 'LAZIO',
+    'REAL BETIS SEVILLE': 'BETIS', 'REAL SOCIEDAD SAN SEBASTIAN': 'SOCIEDAD',
+    'RC DEPORTIVO DE A CORUNA': 'LA CORUNA', 'NEWCASTLE UNITED': 'NEWCASTLE',
+    'NEW CASTLE': 'NEWCASTLE', 'ESPANYOL BARCELONA': 'ESPANOL', '1 FC COLOGNE': 'KOLN',
+    'COLONIA': 'KOLN', 'FC COLOGNE': 'KOLN', 'LEEDS UNITED': 'LEEDS',
 }
 
 
@@ -77,7 +93,7 @@ def similarity(a, b):
         return 1.0
     ratio = SequenceMatcher(None, a, b).ratio()
     ta, tb = set(a.split()), set(b.split())
-    shared = {t for t in ta & tb if len(t) >= 4}
+    shared = {t for t in ta & tb if len(t) >= 4 and t not in GENERIC_SHARED}
     if shared:
         ratio = max(ratio, 0.85)
     if a.startswith(b) or b.startswith(a):

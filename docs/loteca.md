@@ -1,0 +1,103 @@
+# Loteca: metodologia e resultados
+
+Este documento descreve como a página `loteca.html` calcula as probabilidades, como o modelo foi testado e quais são os limites de cada fonte de dados.
+
+## Fontes de dados
+
+| Fonte | O que traz | Arquivo / módulo | Custo |
+|---|---|---|---|
+| API de resultados da Caixa | Todos os concursos desde 2002: 14 jogos, times, UF e placar | `loteca.csv` · `loteca/update.py` | Grátis, sem cadastro |
+| [football-data.co.uk](https://www.football-data.co.uk) | Odds de fechamento (Pinnacle, Bet365, média do mercado) das ligas europeias desde 2002/03 e da Série A desde 2012 | `loteca_odds.csv` · `loteca/odds_history.py` | Grátis, CSV |
+| [OddsPapi](https://oddspapi.io) | Odds da Pinnacle dos jogos dos próximos dias, inclusive estaduais e Série B | `loteca/live.py` | Plano grátis (250 requisições); ~6 por build |
+
+A Caixa **não publica por API os jogos do próximo concurso**, só os já apurados. Por isso a página lista os jogos dos próximos dias com odds e o usuário marca os 14 do concurso (ou adiciona jogos manualmente).
+
+### Problemas conhecidos nos dados da Caixa
+
+* Jogos com resultado **sorteado** (partida não realizada) vêm sem data; usamos a data de apuração e esses jogos **não atualizam o Elo**.
+* Dez concursos antigos (244, 245, 393, 727, 770, 778–781, 786) vêm com jogos faltando; os jogos existentes entram no Elo, mas o concurso fica fora da contagem de acertos por concurso.
+* O mesmo clube aparece com grafias diferentes ao longo dos anos (`VASCO` / `VASCO DA GAMA`, `ATH. BILBAO` / `ATHLETIC BILBAO`). `loteca/data.py::merge_name_variants` unifica nomes da mesma UF quando um só acrescenta palavras genéricas ao outro (`CLUBE`, `ESPORTE`, `CALCIO`…) **e os dois nunca aparecem no mesmo concurso**. Cidades e siglas não unificam de propósito (`PORTUGUESA` ≠ `PORTUGUESA SANTISTA`): é melhor dividir um clube em dois do que misturar dois clubes.
+
+## Modelo
+
+### Elo
+
+Cada time começa com 1500 pontos. Jogo a jogo, em ordem cronológica:
+
+* `diff = rating_mandante + vantagem_de_mando − rating_visitante`
+* resultado esperado do mandante: `1 / (1 + 10^(−diff/400))`
+* o vencedor ganha `K × peso_gols × (resultado − esperado)` pontos e o perdedor perde o mesmo; o peso pela diferença de gols segue o World Football Elo (1; 1,5; (11+n)/8)
+
+`K` e a vantagem de mando são escolhidos por busca em grade (`K ∈ {10, 20, 30, 40, 60}`, mando `∈ {0, 30, 60, 90, 120}`) minimizando o log loss numa validação **dentro** do período de ajuste. Resultado atual: `K = 20`, mando = 30.
+
+### De Elo para probabilidade
+
+Uma regressão logística multinomial transforma o Elo em P(1), P(X), P(2), com três variáveis: diferença de Elo, indicador de "time novo" (menos de 10 jogos no histórico) e a interação entre as duas. O indicador faz o modelo confiar menos em times com pouco histórico. Os coeficientes vão no `loteca.json`, e o navegador recalcula a probabilidade dos jogos manuais com a mesma fórmula.
+
+### Odds
+
+As odds decimais de 1, X e 2 viram probabilidade pelo inverso, normalizado para somar 1 (remove a margem da casa, de 6% a 7% na Pinnacle). No histórico, a preferência é: Pinnacle de fechamento → Pinnacle → média do mercado → Bet365.
+
+### Casamento Caixa × football-data
+
+`loteca/matching.py` liga cada jogo da Caixa ao jogo correspondente do football-data quando:
+
+1. o país bate (UF brasileira → Brasil; `ING`, `ESP`, `ITA`, `FRA`, `DEU`, `NLD`, `PRT`);
+2. a data está entre −1 e +1 dia (fuso horário);
+3. **o placar é idêntico** nas duas fontes;
+4. a similaridade dos nomes (após limpeza, apelidos e traduções) é ≥ 0,6 para os dois times, sem empate com outro candidato.
+
+Casam ~85% dos jogos europeus e 24% dos brasileiros (Série A desde 2012; estaduais e divisões inferiores não têm odds grátis). Nos concursos recentes, ~42% dos jogos têm odds históricas.
+
+## Teste no passado
+
+* **Aquecimento:** os 100 primeiros concursos só alimentam o Elo.
+* **Ajuste:** concursos 101 a 641 (escolha de K, mando e da regressão logística).
+* **Teste:** concursos 642 a 1283, nunca usados para escolher nada. Cada jogo é previsto só com os resultados anteriores a ele.
+
+### Acertos por concurso (aposta simples, 14 jogos)
+
+| Estratégia | Acertos / concurso | Acerto por jogo | Concursos com 10+ |
+|---|---|---|---|
+| Odds quando houver, senão Elo | **7,02** | — | — |
+| Elo | 6,87 | 49,0% | 48 |
+| Sempre o mandante | 6,44 | 46,0% | 28 |
+| Chute aleatório | 4,67 | 33,4% | 5 |
+
+### Nos ~4 mil jogos de teste com odds históricas
+
+| Preditor | Acerto | Log loss | Brier |
+|---|---|---|---|
+| **Odds (Pinnacle, sem margem)** | **52,8%** | **0,984** | **0,587** |
+| Elo + odds combinados | 52,2% | 0,985 | 0,588 |
+| Elo | 50,1% | 1,019 | 0,611 |
+
+As odds já incorporam o que o Elo sabe (e notícias, lesões e escalações): a combinação não melhora as odds sozinhas. Por isso a página usa odds quando existem e o Elo só como reserva.
+
+### Calibração do Elo
+
+Quando o Elo dá 42,6% para o palpite, o resultado acontece 42,5% das vezes. Nos palpites de alta confiança (> 70%) ele exagera um pouco: prevê 76% e acontece 69%.
+
+Os números acima são do teste rodado em novembro de 2026; a página mostra sempre os valores do último build.
+
+## Montador de aposta
+
+Para cada jogo selecionado há três opções: simples (resultado mais provável), duplo (os dois mais prováveis) ou triplo. Dado o número de duplos e triplos escolhido, uma programação dinâmica distribui as marcações extras para **maximizar a probabilidade de acertar todos os jogos** (produto das probabilidades cobertas). A chance de 13 ou mais acertos vem da distribuição de Poisson-binomial das coberturas.
+
+Preço usado: **R$ 2,00 por combinação** (aposta mínima de R$ 4,00 com 1 duplo; máximo de 5 duplos e 3 triplos). Os valores vêm de notícias de 2026 e podem mudar: estão em `loteca/results.py::PRICING` e a página pede para conferir na Caixa.
+
+## Limites
+
+* Acertar mais jogos **não torna a aposta lucrativa**: a Caixa retém parte da arrecadação e o prêmio é dividido entre os ganhadores.
+* Estaduais e Série B não têm odds históricas grátis; o teste das odds cobre principalmente ligas europeias e Série A.
+* O Elo de times europeus é pouco confiável: eles aparecem pouco na Loteca. Nos jogos com odds isso não importa.
+* Seleções: a OddsPapi traz os nomes em inglês e a Caixa em português, então o Elo não casa com esses jogos (as odds continuam valendo).
+
+## Como reproduzir
+
+```bash
+python -m loteca.update          # concursos novos da Loteca
+python -m loteca.odds_history    # odds históricas (~5 min, ~280 arquivos)
+python -m loteca.backtest        # teste do Elo (JSON)
+ODDSPAPI_KEY=... python generate_loteca.py   # loteca.json completo
+```

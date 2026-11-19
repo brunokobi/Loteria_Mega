@@ -1,4 +1,4 @@
-# 🎰 Mega-Sena IA – Dá para prever a loteria com Machine Learning?
+# 🎰 Loterias IA – Dá para prever a loteria com Machine Learning?
 
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
 ![Machine Learning](https://img.shields.io/badge/Machine%20Learning-Gradient%20Boosting-green)
@@ -9,13 +9,16 @@
 
 🌐 **[loteriabruno.netlify.app](https://loteriabruno.netlify.app)**
 
-Este repositório é um **experimento educacional de Machine Learning** sobre o histórico da **Mega-Sena**. Um modelo é treinado com o histórico de sorteios e depois **avaliado com rigor** contra baselines simples e contra a teoria da probabilidade. O resultado esperado, e confirmado pelos números, é que **nenhum modelo consegue prever os sorteios**.
+Este repositório é um **experimento educacional de Machine Learning** com duas loterias da Caixa, sempre **avaliado com rigor** contra baselines simples:
 
-> ⚠️ **Aviso importante**: Loterias são processos aleatórios. As combinações geradas aqui **não têm mais chance de sair** do que quaisquer outras. Use o projeto **exclusivamente para estudo de estatística e IA**.
+* **Mega-Sena** (`index.html`): um modelo treinado com o histórico de sorteios. O resultado esperado, e confirmado pelos números, é que **nenhum modelo consegue prever os sorteios**.
+* **Loteca** (`loteca.html`): probabilidades dos jogos de futebol pelas **odds da Pinnacle** e por um **rating Elo** treinado com 1283 concursos, mais um montador de duplos e triplos. Aqui, ao contrário da Mega-Sena, **dá para acertar mais que o acaso** (≈7,0 acertos por concurso contra 4,7 no chute), mas o retorno esperado da aposta continua negativo.
+
+> ⚠️ **Aviso importante**: as combinações da Mega-Sena **não têm mais chance de sair** do que quaisquer outras, e nenhuma ferramenta torna a Loteca lucrativa. Use o projeto **exclusivamente para estudo de estatística e IA**.
 
 ---
 
-## 📌 Visão Geral
+## 📌 Mega-Sena: Visão Geral
 
 O pipeline:
 
@@ -41,25 +44,38 @@ O pipeline:
 │   ├── strategies.py               #   estratégias vs. distribuição hipergeométrica
 │   ├── results.py                  #   monta o dicionário do results.json
 │   └── update.py                   #   baixa concursos novos da API da Caixa
+├── loteca/                         # Análise da Loteca (detalhes em docs/loteca.md)
+│   ├── update.py                   #   histórico de concursos pela API da Caixa
+│   ├── data.py                     #   carga, normalização e unificação de nomes de times
+│   ├── elo.py / model.py           #   rating Elo e probabilidades 1/X/2
+│   ├── odds_history.py             #   odds históricas do football-data.co.uk
+│   ├── matching.py                 #   casa jogos da Caixa com o football-data
+│   ├── backtest.py                 #   teste no passado (Elo, odds, combinação)
+│   ├── live.py                     #   jogos da semana com odds da OddsPapi
+│   └── results.py                  #   monta o loteca.json
+├── docs/loteca.md                  # Metodologia e resultados da Loteca
 ├── tests/                          # Testes (pytest)
-├── update_dataset.py               # Atualiza o CSV com os concursos mais recentes
-├── mega3.py                        # CLI — análise completa no terminal
-├── generate_results.py             # Gera results.json para a interface web
-├── index.html                      # Interface web (estrutura da página)
-├── styles.css                      # Estilos da interface
-├── app.js                          # Renderização dos dados e botão de atualizar
+├── update_dataset.py               # Atualiza o CSV da Mega-Sena com os concursos recentes
+├── mega3.py                        # CLI — análise completa da Mega-Sena no terminal
+├── generate_results.py             # Gera results.json (Mega-Sena)
+├── generate_loteca.py              # Gera loteca.json (Loteca)
+├── index.html / app.js             # Página da Mega-Sena
+├── loteca.html / loteca.js         # Página da Loteca
+├── styles.css                      # Estilos compartilhados
 ├── netlify/functions/              # Função que dispara novo build no Netlify
 ├── .github/workflows/ci.yml        # CI: ruff + pytest
 ├── pyproject.toml                  # Configuração do ruff e do pytest
 ├── requirements.txt                # Dependências de execução (versões fixas)
 ├── requirements-dev.txt            # + dependências de desenvolvimento
 ├── lottery-br-mega-sena.csv        # Dataset histórico da Mega-Sena
+├── loteca.csv                      # Histórico da Loteca (1283 concursos, 17.952 jogos)
+├── loteca_odds.csv                 # Odds históricas (football-data.co.uk, ~100 mil jogos)
 └── netlify.toml                    # Configuração de deploy
 ```
 
 ---
 
-## 📊 Dataset
+## 📊 Dataset da Mega-Sena
 
 **Arquivo:** `lottery-br-mega-sena.csv`, com todos os sorteios desde **1996-03-11** (concurso 1). A base original veio do Kaggle (até o concurso 2806) e é completada com a **API pública de resultados da Caixa**.
 
@@ -125,6 +141,28 @@ A referência é a **distribuição hipergeométrica**: um jogo de 6 números ac
 
 ---
 
+## ⚽ Loteca
+
+Resumo; a metodologia completa está em **[docs/loteca.md](docs/loteca.md)**.
+
+* **Dados:** 1283 concursos (17.952 jogos) da API da Caixa, desde 2002, e ~100 mil jogos com odds históricas do football-data.co.uk (ligas europeias desde 2002 e Série A desde 2012).
+* **Elo:** rating de força de cada time, atualizado jogo a jogo em ordem cronológica, convertido em probabilidade de 1/X/2 por regressão logística.
+* **Odds:** odds da Pinnacle sem a margem da casa. Nos jogos que têm odds, elas ganham do Elo, e combinar os dois não melhora.
+* **Estratégia:** odds quando o jogo tem, Elo nos demais.
+
+Resultado no teste (642 concursos que o modelo nunca viu, aposta simples):
+
+| Estratégia | Acertos por concurso (de 14) |
+|---|---|
+| Odds quando houver, senão Elo | **7,02** |
+| Elo | 6,87 |
+| Sempre o mandante | 6,44 |
+| Chute aleatório | 4,67 |
+
+A página `loteca.html` mostra os jogos dos próximos dias com odds, permite adicionar jogos manualmente (probabilidade pelo Elo) e tem um **montador de aposta** que coloca os duplos e triplos onde há mais incerteza, com custo e chance de 14 e de 13 acertos.
+
+---
+
 ## 🌐 Interface Web
 
 **👉 [loteriabruno.netlify.app](https://loteriabruno.netlify.app)**
@@ -139,7 +177,18 @@ A interface exibe:
 
 **Acessibilidade:** contraste de texto WCAG AA, landmarks e link para pular ao conteúdo, foco visível, heatmap navegável por teclado (setas) e por toque, textos alternativos para os jogos e gráficos, e respeito à preferência do sistema por menos movimento (sem animações nem física no hero). A auditoria com axe-core (regras WCAG 2 A/AA e boas práticas) não aponta violações.
 
-O build roda `update_dataset.py` e depois `generate_results.py`, e leva cerca de 1 a 2 minutos.
+A página **Loteca** (`loteca.html`) tem os jogos da semana com odds, o jogo manual, o montador de aposta e o teste no histórico, com a mesma base de acessibilidade.
+
+O build roda `update_dataset.py`, `generate_results.py` e `generate_loteca.py`, e leva cerca de 2 a 3 minutos.
+
+### Variáveis de ambiente (Netlify)
+
+| Variável | Para quê | Obrigatória? |
+|---|---|---|
+| `BUILD_HOOK_URL` | Botão "Atualizar Análise" dispara um novo build | Só para o botão |
+| `ODDSPAPI_KEY` | Odds da semana na página da Loteca ([OddsPapi](https://oddspapi.io), plano grátis) | Não: sem ela, a Loteca fica só com o Elo |
+
+Cada build gasta cerca de 6 requisições da OddsPapi (o plano grátis tem 250). As chaves ficam só nas variáveis de ambiente, nunca no repositório.
 
 ---
 
@@ -156,7 +205,13 @@ python mega3.py
 
 # Gerar dados para a interface web e servir localmente
 python generate_results.py
+python generate_loteca.py          # com ODDSPAPI_KEY definida, inclui as odds da semana
 python -m http.server 8080
+
+# Loteca: teste no passado e odds históricas
+python -m loteca.update            # baixa concursos novos da Loteca
+python -m loteca.odds_history      # baixa de novo as odds históricas (~5 min)
+python -m loteca.backtest          # imprime o teste do Elo em JSON
 ```
 
 ### Desenvolvimento
@@ -167,7 +222,7 @@ ruff check .
 pytest
 ```
 
-Os testes cobrem a ausência de data leakage nas features, a equivalência da versão vetorizada com a implementação original, as regras dos jogos balanceados, a distribuição hipergeométrica, a atualização do dataset (com a API simulada) e o formato do `results.json`. O CI (GitHub Actions, Python 3.11) roda ruff e pytest a cada push e PR.
+Os testes cobrem a ausência de data leakage nas features, a equivalência da versão vetorizada com a implementação original, as regras dos jogos balanceados, a distribuição hipergeométrica, a atualização do dataset (com a API simulada) e o formato do `results.json`. Na Loteca: Elo sem olhar o futuro, casamento de jogos exigindo o mesmo placar, remoção da margem das odds, unificação de nomes de times e falhas das APIs. O CI (GitHub Actions, Python 3.11) roda ruff e pytest a cada push e PR.
 
 ---
 
@@ -201,13 +256,15 @@ O `score` é a média das probabilidades estimadas pelo modelo para os 6 número
 ## 🚀 Possíveis Melhorias Futuras
 
 * Build agendado após cada sorteio (quartas e sábados)
+* Proteger o botão "Atualizar Análise" contra builds em excesso
+* Loteca: guardar as odds de cada semana para formar um histórico próprio dos estaduais e da Série B
 * Comparação com outros modelos (XGBoost, Random Forest, Redes Neurais)
 
 ---
 
 ## 🏷️ Tags
 
-`#MachineLearning` `#DataScience` `#Python` `#ScikitLearn` `#Loteria` `#MegaSena` `#IA` `#Estatística` `#GradientBoosting`
+`#MachineLearning` `#DataScience` `#Python` `#ScikitLearn` `#Loteria` `#MegaSena` `#Loteca` `#Futebol` `#Elo` `#IA` `#Estatística` `#GradientBoosting`
 
 ---
 

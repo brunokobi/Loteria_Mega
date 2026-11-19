@@ -60,10 +60,10 @@ def round_hits(games_mask_df, picks):
     return g.loc[g['count'] == 14, 'sum'].to_numpy()
 
 
-def run_backtest(games=None):
+def run_backtest(games=None, params=None):
     games = load_games() if games is None else games
     warm, cut = _split(games)
-    params = tune(games, warm, cut)
+    params = params or tune(games, warm, cut)
 
     diff, ming, ratings, played = run_elo(games, k=params['k'], home_adv=params['home_adv'])
     rounds = games['concurso'].to_numpy()
@@ -142,7 +142,7 @@ def _odds_features(diff, ming, odds_probs):
     return np.column_stack([features(diff, ming), logp])
 
 
-def run_odds_comparison(games=None, odds_path=None):
+def run_odds_comparison(games=None, odds_path=None, params=None):
     """
     Nos jogos que tem odds historicas (football-data.co.uk), compara no periodo de teste:
       - Elo sozinho, odds sozinhas (probabilidade sem margem) e a combinacao (regressao
@@ -157,7 +157,7 @@ def run_odds_comparison(games=None, odds_path=None):
 
     games = load_games() if games is None else games
     warm, cut = _split(games)
-    params = tune(games, warm, cut)
+    params = params or tune(games, warm, cut)
     diff, ming, _, _ = run_elo(games, k=params['k'], home_adv=params['home_adv'])
     rounds = games['concurso'].to_numpy()
     y = games['y'].to_numpy()
