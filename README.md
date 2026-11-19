@@ -19,7 +19,7 @@ Este repositório é um **experimento educacional de Machine Learning** sobre o 
 
 O pipeline:
 
-1. Carrega todo o histórico de sorteios da Mega-Sena
+1. Atualiza e carrega todo o histórico de sorteios da Mega-Sena
 2. Calcula estatísticas descritivas (frequência, par/ímpar, décadas, soma, consecutivos)
 3. Constrói um dataset supervisionado por número e sorteio, **sem data leakage**
 4. Treina um **Gradient Boosting** e o valida contra dois baselines (holdout 80/20 e walk-forward)
@@ -39,8 +39,10 @@ O pipeline:
 │   ├── model.py                    #   modelo, métricas, holdout e walk-forward
 │   ├── combinations.py             #   jogos ponderados e balanceados
 │   ├── strategies.py               #   estratégias vs. distribuição hipergeométrica
-│   └── results.py                  #   monta o dicionário do results.json
+│   ├── results.py                  #   monta o dicionário do results.json
+│   └── update.py                   #   baixa concursos novos da API da Caixa
 ├── tests/                          # Testes (pytest)
+├── update_dataset.py               # Atualiza o CSV com os concursos mais recentes
 ├── mega3.py                        # CLI — análise completa no terminal
 ├── generate_results.py             # Gera results.json para a interface web
 ├── index.html                      # Interface web (dashboard)
@@ -57,7 +59,11 @@ O pipeline:
 
 ## 📊 Dataset
 
-**Arquivo:** `lottery-br-mega-sena.csv` (origem: Kaggle), com sorteios de **1996-03-11 a 2024-12-10** (2806 concursos).
+**Arquivo:** `lottery-br-mega-sena.csv`, com todos os sorteios desde **1996-03-11** (concurso 1). A base original veio do Kaggle (até o concurso 2806) e é completada com a **API pública de resultados da Caixa**.
+
+### Atualização automática
+
+`update_dataset.py` consulta o último concurso na API, baixa os que faltam no CSV, valida cada um (6 dezenas únicas entre 1 e 60, número do concurso esperado) e acrescenta ao arquivo. O build do Netlify roda esse script antes da análise, então **cada build usa os sorteios mais recentes**. Se a API estiver fora do ar, o CSV atual é mantido e o build segue normalmente.
 
 Cada linha tem `DrawDate` (data do sorteio) e `Ball1` a `Ball6` (números sorteados, 1 a 60). Os dados são ordenados por `DrawDate`.
 
@@ -129,7 +135,7 @@ A interface exibe:
 - Estratégias com IC 95% e linha do valor esperado
 - Botão **"Atualizar Análise"**, que dispara um novo build com barra de progresso. Se o build passar de 10 minutos, a página avisa e reabilita o botão
 
-O build roda `generate_results.py` e leva cerca de 2 minutos.
+O build roda `update_dataset.py` e depois `generate_results.py`, e leva cerca de 1 a 2 minutos.
 
 ---
 
@@ -137,6 +143,9 @@ O build roda `generate_results.py` e leva cerca de 2 minutos.
 
 ```bash
 pip install -r requirements.txt
+
+# (opcional) Buscar os concursos mais recentes
+python update_dataset.py
 
 # Análise completa no terminal
 python mega3.py
@@ -154,22 +163,22 @@ ruff check .
 pytest
 ```
 
-Os testes cobrem a ausência de data leakage nas features, a equivalência da versão vetorizada com a implementação original, as regras dos jogos balanceados, a distribuição hipergeométrica e o formato do `results.json`. O CI (GitHub Actions, Python 3.11) roda ruff e pytest a cada push e PR.
+Os testes cobrem a ausência de data leakage nas features, a equivalência da versão vetorizada com a implementação original, as regras dos jogos balanceados, a distribuição hipergeométrica, a atualização do dataset (com a API simulada) e o formato do `results.json`. O CI (GitHub Actions, Python 3.11) roda ruff e pytest a cada push e PR.
 
 ---
 
-## 📈 Exemplo de Saída (`mega3.py`)
+## 📈 Exemplo de Saída (`mega3.py`, histórico até o concurso 3087)
 
 ```text
 Walk-forward (5 folds, janela expansiva) - media +- desvio:
   Preditor                                    AUC         Log loss            Brier
-  Modelo GradientBoosting          0.5009+-0.0073   0.3276+-0.0051   0.0904+-0.0007
+  Modelo GradientBoosting          0.5013+-0.0094   0.3275+-0.0045   0.0904+-0.0007
   Baseline constante (6/60)        0.5000+-0.0000   0.3251+-0.0000   0.0900+-0.0000
-  Baseline frequencia historica    0.5058+-0.0093   0.3252+-0.0003   0.0900+-0.0000
+  Baseline frequencia historica    0.5062+-0.0072   0.3252+-0.0002   0.0900+-0.0000
 
 TOP 10 COMBINACOES GERADAS
-#1    | [3, 5, 17, 38, 53, 56]             | score: 0.1194
-#2    | [3, 17, 35, 38, 54, 57]            | score: 0.1182
+#1    | [4, 6, 27, 30, 34, 48]             | score: 0.1034
+#2    | [28, 32, 34, 38, 42, 59]           | score: 0.1031
 ...
 ```
 
@@ -182,13 +191,12 @@ O `score` é a média das probabilidades estimadas pelo modelo para os 6 número
 * Cada sorteio é independente: o histórico não carrega informação sobre o próximo
 * O modelo não supera baselines triviais, nem no holdout nem no walk-forward
 * Nenhuma estratégia se afasta do valor teórico de forma consistente. Com várias estratégias testadas, um desvio isolado do IC 95% é esperado por acaso
-* O dataset vai até dezembro de 2024 e não é atualizado automaticamente
 
 ---
 
 ## 🚀 Possíveis Melhorias Futuras
 
-* Atualização automática do dataset com novos sorteios
+* Build agendado após cada sorteio (quartas e sábados)
 * Comparação com outros modelos (XGBoost, Random Forest, Redes Neurais)
 
 ---
