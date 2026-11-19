@@ -1,6 +1,6 @@
-# 🎰 Mega-Sena IA – Previsão de Combinações com Machine Learning
+# 🎰 Mega-Sena IA – Dá para prever a loteria com Machine Learning?
 
-![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
+![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
 ![Machine Learning](https://img.shields.io/badge/Machine%20Learning-Gradient%20Boosting-green)
 ![Status](https://img.shields.io/badge/Status-Ativo-orange)
 ![License](https://img.shields.io/badge/License-Educational-lightgrey)
@@ -9,22 +9,22 @@
 
 🌐 **[loteriabruno.netlify.app](https://loteriabruno.netlify.app)**
 
-Este repositório apresenta um **experimento educacional de Machine Learning** aplicado aos dados históricos da **Mega-Sena (loteria brasileira)**. O objetivo é **analisar padrões estatísticos** do histórico de sorteios e gerar **combinações de números com maior probabilidade relativa**, com base em um modelo treinado.
+Este repositório é um **experimento educacional de Machine Learning** sobre o histórico da **Mega-Sena**. Um modelo é treinado com o histórico de sorteios e depois **avaliado com rigor** contra baselines simples e contra a teoria da probabilidade. O resultado esperado, e confirmado pelos números, é que **nenhum modelo consegue prever os sorteios**.
 
-> ⚠️ **Aviso importante**: Loterias são processos aleatórios. Este projeto **não garante ganhos financeiros** e deve ser usado **exclusivamente para fins educacionais, estatísticos e de estudo em IA**.
+> ⚠️ **Aviso importante**: Loterias são processos aleatórios. As combinações geradas aqui **não têm mais chance de sair** do que quaisquer outras. Use o projeto **exclusivamente para estudo de estatística e IA**.
 
 ---
 
-## 📌 Visão Geral do Projeto
+## 📌 Visão Geral
 
-O script:
+O pipeline:
 
 1. Carrega todo o histórico de sorteios da Mega-Sena
-2. Constrói um dataset supervisionado baseado em **atraso dos números** e **paridade**
-3. Treina um modelo de **Machine Learning (Gradient Boosting)**
-4. Calcula probabilidades individuais para cada número (1 a 60)
-5. Gera combinações ponderadas por probabilidade
-6. Exibe as **10 melhores combinações** entre 100 geradas
+2. Calcula estatísticas descritivas (frequência, par/ímpar, décadas, soma, consecutivos)
+3. Constrói um dataset supervisionado por número e sorteio, **sem data leakage**
+4. Treina um **Gradient Boosting** e o valida contra dois baselines (holdout 80/20 e walk-forward)
+5. Gera combinações ponderadas pelas probabilidades do modelo e combinações "balanceadas"
+6. Simula 4 estratégias de aposta nos últimos 500 sorteios e compara com o valor teórico
 
 ---
 
@@ -32,163 +32,164 @@ O script:
 
 ```bash
 .
-├── mega3.py                        # Script CLI — análise completa no terminal
+├── megasena/                       # Núcleo da análise (usado pela CLI e pelo build)
+│   ├── data.py                     #   carga do CSV e matriz de ocorrências
+│   ├── features.py                 #   engenharia de features (vetorizada)
+│   ├── stats.py                    #   estatísticas descritivas
+│   ├── model.py                    #   modelo, métricas, holdout e walk-forward
+│   ├── combinations.py             #   jogos ponderados e balanceados
+│   ├── strategies.py               #   estratégias vs. distribuição hipergeométrica
+│   └── results.py                  #   monta o dicionário do results.json
+├── tests/                          # Testes (pytest)
+├── mega3.py                        # CLI — análise completa no terminal
 ├── generate_results.py             # Gera results.json para a interface web
 ├── index.html                      # Interface web (dashboard)
-├── favicon.svg                     # Favicon da aplicação
-├── netlify.toml                    # Configuração de deploy (Netlify)
-├── requirements.txt                # Dependências Python
+├── netlify/functions/              # Função que dispara novo build no Netlify
+├── .github/workflows/ci.yml        # CI: ruff + pytest
+├── pyproject.toml                  # Configuração do ruff e do pytest
+├── requirements.txt                # Dependências de execução (versões fixas)
+├── requirements-dev.txt            # + dependências de desenvolvimento
 ├── lottery-br-mega-sena.csv        # Dataset histórico da Mega-Sena
-└── README.md                       # Documentação do projeto
+└── netlify.toml                    # Configuração de deploy
 ```
 
 ---
 
-## 📊 Dataset Utilizado
+## 📊 Dataset
 
-**Arquivo:** `lottery-br-mega-sena.csv`
+**Arquivo:** `lottery-br-mega-sena.csv` (origem: Kaggle), com sorteios de **1996-03-11 a 2024-12-10** (2806 concursos).
 
-### Conteúdo do Dataset
-
-<p align="left">
-  <a href="https://www.kaggle.com" target="_blank">
-    <img src="https://img.shields.io/badge/Dataset-Kaggle-20BEFF?logo=kaggle&logoColor=white" alt="Kaggle Dataset" />
-  </a>
-</p>
-
-Cada linha representa um sorteio histórico da Mega-Sena, contendo:
-
-* `DrawDate` → Data do sorteio
-* `Ball1` a `Ball6` → Números sorteados (1 a 60)
-
-### Pré-processamento
-
-* Ordenação cronológica pelo campo `DrawDate`
-* Uso de **100% do histórico disponível** (sem divisão treino/teste, por se tratar de análise estatística global)
-
----
-
-## 🧠 Modelo de Machine Learning
-
-### Algoritmo Utilizado
-
-* **Gradient Boosting Classifier** (`sklearn.ensemble.GradientBoostingClassifier`)
-
-### Por que Gradient Boosting?
-
-* Excelente para dados tabulares
-* Capaz de capturar padrões não-lineares
-* Robusto contra overfitting moderado
+Cada linha tem `DrawDate` (data do sorteio) e `Ball1` a `Ball6` (números sorteados, 1 a 60). Os dados são ordenados por `DrawDate`.
 
 ---
 
 ## 🧮 Engenharia de Features
 
-Para **cada número de 1 a 60**, em **cada sorteio**, são criadas as seguintes features (sem data leakage — estado computado antes do sorteio):
+Para **cada número de 1 a 60**, em **cada sorteio**, as features usam apenas os sorteios anteriores:
 
-| Feature           | Descrição                                                       |
-| ----------------- | --------------------------------------------------------------- |
-| `atraso`          | Quantidade de sorteios desde a última vez que o número apareceu |
-| `paridade`        | 1 se o número for par, 0 se ímpar                               |
-| `freq_relativa`   | Frequência acumulada até o sorteio anterior                     |
-| `decada`          | Faixa do número: 0=1-10, 1=11-20, ... 5=51-60                  |
-| `freq_recente`    | Aparições nas últimas 20 jogadas                                |
+| Feature         | Descrição                                                        |
+| --------------- | ---------------------------------------------------------------- |
+| `atraso`        | Sorteios desde a última vez que o número apareceu                |
+| `paridade`      | 1 se o número for par, 0 se ímpar                                |
+| `freq_relativa` | Frequência acumulada até o sorteio anterior                      |
+| `decada`        | Faixa do número: 0=1-10, 1=11-20, ... 5=51-60                    |
+| `freq_recente`  | Aparições nos últimos 20 sorteios                                |
 
-### Variável Alvo (`y`)
+`paridade` e `decada` são fixas para cada número: na prática, dão ao modelo a identidade do número.
 
-* `1` → Número foi sorteado naquele concurso
-* `0` → Número não foi sorteado
-
-Isso transforma o problema em uma **classificação binária**: *qual a chance de um número aparecer no próximo sorteio?*
+**Alvo (`y`)**: 1 se o número saiu naquele sorteio, 0 caso contrário (classificação binária, taxa base 6/60 = 10%).
 
 ---
 
-## ⚙️ Parâmetros do Modelo
+## 🧠 Modelo
 
 ```python
-GradientBoostingClassifier(
-    n_estimators=100,
-    learning_rate=0.1,
-    max_depth=3,
-    random_state=42
-)
+GradientBoostingClassifier(n_estimators=100, learning_rate=0.1, max_depth=3, random_state=42)
 ```
 
 ---
 
-## 🎯 Geração das Combinações
+## 🔬 Validação
 
-1. O modelo calcula a **probabilidade individual** de cada número (1–60)
-2. São geradas **100 combinações únicas** de 6 números
-3. A seleção é feita por **amostragem ponderada pelas probabilidades**
-4. Cada jogo recebe um **score médio de probabilidade**
-5. As **10 melhores combinações** são exibidas
+O modelo é comparado com dois baselines que não aprendem nada:
+
+* **Constante**: probabilidade 6/60 = 0,1 para todo número
+* **Frequência histórica**: probabilidade = frequência acumulada do número até o sorteio anterior
+
+As métricas são **AUC-ROC**, **log loss** e **Brier score**. Menores log loss e Brier são melhores, e AUC 0,5 significa nenhum poder preditivo. A avaliação é feita de dois jeitos:
+
+* **Holdout temporal 80/20**: treina nos primeiros 80% dos sorteios e testa nos 20% finais
+* **Walk-forward (5 folds, janela expansiva)**: a partir da metade do histórico, cada fold treina com todo o passado e testa no bloco seguinte. O resultado é a média ± desvio
+
+Resultado atual: o modelo tem AUC ≈ 0,50 e **log loss pior que os dois baselines**. Ele não supera nem a regra "todo número tem 10% de chance".
+
+---
+
+## 🎯 Estratégias vs. Teoria
+
+Nos últimos 500 sorteios, cada estratégia escolhe 6 números **antes** de cada sorteio:
+
+* **Aleatória**: 6 números ao acaso
+* **Quentes / Frias**: os 6 mais e os 6 menos sorteados até o sorteio anterior
+* **Balanceada**: soma entre 110 e 230, 2 a 4 pares, no máximo 1 par consecutivo e pelo menos 3 décadas
+
+A referência é a **distribuição hipergeométrica**: um jogo de 6 números acerta em média **6×6/60 = 0,6** números por sorteio, e a chance de 3 acertos é ≈ 0,99%. Para cada estratégia são mostrados a média observada com **intervalo de confiança de 95%** e as contagens esperadas de 3 acertos, quadra, quina e sena.
 
 ---
 
 ## 🌐 Interface Web
 
-Acesse a aplicação em produção:
-
 **👉 [loteriabruno.netlify.app](https://loteriabruno.netlify.app)**
 
 A interface exibe:
-- Top 10 combinações com bolinhas animadas
+- Top 10 combinações geradas pelo modelo e 10 combinações balanceadas
 - Heatmap de frequência dos 60 números
-- Análise estatística (par/ímpar, décadas, soma)
-- Validação temporal com AUC-ROC
-- Botão **"Atualizar Análise"** para disparar novo build com barra de progresso em tempo real
+- Estatísticas descritivas (par/ímpar, décadas, soma)
+- Validação: AUC, tabela modelo × baselines e resumo do walk-forward
+- Estratégias com IC 95% e linha do valor esperado
+- Botão **"Atualizar Análise"**, que dispara um novo build com barra de progresso. Se o build passar de 10 minutos, a página avisa e reabilita o botão
+
+O build roda `generate_results.py` e leva cerca de 2 minutos.
 
 ---
 
 ## ▶️ Como Executar Localmente
 
-### 1️⃣ Instalar Dependências
-
 ```bash
 pip install -r requirements.txt
-```
 
-### 2️⃣ Script CLI (terminal)
-
-```bash
+# Análise completa no terminal
 python mega3.py
-```
 
-### 3️⃣ Gerar dados para a interface web
-
-```bash
+# Gerar dados para a interface web e servir localmente
 python generate_results.py
-# Abre index.html em um servidor local:
 python -m http.server 8080
 ```
 
+### Desenvolvimento
+
+```bash
+pip install -r requirements-dev.txt
+ruff check .
+pytest
+```
+
+Os testes cobrem a ausência de data leakage nas features, a equivalência da versão vetorizada com a implementação original, as regras dos jogos balanceados, a distribuição hipergeométrica e o formato do `results.json`. O CI (GitHub Actions, Python 3.11) roda ruff e pytest a cada push e PR.
+
 ---
 
-## 📈 Exemplo de Saída
+## 📈 Exemplo de Saída (`mega3.py`)
 
 ```text
-🤖 IA TREINADA COM HISTÓRICO COMPLETO
-#1    | [3, 11, 24, 36, 42, 58] | 0.6134
-#2    | [5, 18, 27, 33, 44, 59] | 0.6098
+Walk-forward (5 folds, janela expansiva) - media +- desvio:
+  Preditor                                    AUC         Log loss            Brier
+  Modelo GradientBoosting          0.5009+-0.0073   0.3276+-0.0051   0.0904+-0.0007
+  Baseline constante (6/60)        0.5000+-0.0000   0.3251+-0.0000   0.0900+-0.0000
+  Baseline frequencia historica    0.5058+-0.0093   0.3252+-0.0003   0.0900+-0.0000
+
+TOP 10 COMBINACOES GERADAS
+#1    | [3, 5, 17, 38, 53, 56]             | score: 0.1194
+#2    | [3, 17, 35, 38, 54, 57]            | score: 0.1182
 ...
 ```
 
+O `score` é a média das probabilidades estimadas pelo modelo para os 6 números, próxima da taxa base de 0,10.
+
 ---
 
-## 🧪 Limitações Conhecidas
+## 🧪 Limitações e Conclusões
 
-* Loterias são **processos estocásticos** — cada sorteio é independente
-* O modelo **não prevê o futuro**, apenas explora padrões históricos
-* AUC-ROC ≈ 0.5 confirma que o modelo não supera o baseline aleatório
+* Cada sorteio é independente: o histórico não carrega informação sobre o próximo
+* O modelo não supera baselines triviais, nem no holdout nem no walk-forward
+* Nenhuma estratégia se afasta do valor teórico de forma consistente. Com várias estratégias testadas, um desvio isolado do IC 95% é esperado por acaso
+* O dataset vai até dezembro de 2024 e não é atualizado automaticamente
 
 ---
 
 ## 🚀 Possíveis Melhorias Futuras
 
-* Comparação com outros modelos (XGBoost, Random Forest, Redes Neurais)
-* Validação com janela deslizante (walk-forward)
 * Atualização automática do dataset com novos sorteios
+* Comparação com outros modelos (XGBoost, Random Forest, Redes Neurais)
 
 ---
 
