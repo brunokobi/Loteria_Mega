@@ -45,7 +45,9 @@ O pipeline:
 ├── update_dataset.py               # Atualiza o CSV com os concursos mais recentes
 ├── mega3.py                        # CLI — análise completa no terminal
 ├── generate_results.py             # Gera results.json para a interface web
-├── index.html                      # Interface web (dashboard)
+├── index.html                      # Interface web (estrutura da página)
+├── styles.css                      # Estilos da interface
+├── app.js                          # Renderização dos dados e botão de atualizar
 ├── netlify/functions/              # Função que dispara novo build no Netlify
 ├── .github/workflows/ci.yml        # CI: ruff + pytest
 ├── pyproject.toml                  # Configuração do ruff e do pytest
@@ -134,6 +136,8 @@ A interface exibe:
 - Validação: AUC, tabela modelo × baselines e resumo do walk-forward
 - Estratégias com IC 95% e linha do valor esperado
 - Botão **"Atualizar Análise"**, que dispara um novo build com barra de progresso. Se o build passar de 10 minutos, a página avisa e reabilita o botão
+
+**Acessibilidade:** contraste de texto WCAG AA, landmarks e link para pular ao conteúdo, foco visível, heatmap navegável por teclado (setas) e por toque, textos alternativos para os jogos e gráficos, e respeito à preferência do sistema por menos movimento (sem animações nem física no hero). A auditoria com axe-core (regras WCAG 2 A/AA e boas práticas) não aponta violações.
 
 O build roda `update_dataset.py` e depois `generate_results.py`, e leva cerca de 1 a 2 minutos.
 

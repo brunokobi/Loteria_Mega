@@ -12,7 +12,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: 'BUILD_HOOK_URL nao configurada. Va em Netlify > Site settings > Build hooks, crie um hook e adicione a URL como variavel de ambiente.' })
+      body: JSON.stringify({ error: 'BUILD_HOOK_URL não configurada. Vá em Netlify > Site settings > Build hooks, crie um hook e adicione a URL como variável de ambiente.' })
     };
   }
 
@@ -21,7 +21,7 @@ exports.handler = async (event) => {
       resolve({
         statusCode: 200,
         headers,
-        body: JSON.stringify({ ok: true, message: 'Build iniciado! A analise sera atualizada em alguns minutos.' })
+        body: JSON.stringify({ ok: true, message: 'Build iniciado! A análise será atualizada em alguns minutos.' })
       });
     });
 

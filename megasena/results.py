@@ -1,11 +1,14 @@
 """Monta o dicionario completo da analise (gravado em results.json)."""
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from .combinations import balanced_samples, generate_model_combinations
 from .features import build_dataset
 from .model import holdout_validation, make_model, walk_forward
 from .stats import descriptive_stats
 from .strategies import compare_strategies, hypergeom_expected
+
+TIMEZONE = ZoneInfo('America/Sao_Paulo')
 
 
 def _silent(*_args, **_kwargs):
@@ -54,7 +57,8 @@ def build_results(df, *, n_estimators=100, n_folds=5, n_test_strategies=500, log
             "total_draws": n_draws,
             "date_start": date_start,
             "date_end": date_end,
-            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            # horario de Brasilia: o build roda em servidor UTC
+            "generated_at": datetime.now(TIMEZONE).strftime("%Y-%m-%d %H:%M"),
         },
         "combinations": [{"numbers": nums, "score": round(s, 4)} for nums, s in combos[:10]],
         "numbers": numbers,

@@ -3,720 +3,134 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mega-Sena IA — Analise com Machine Learning</title>
+  <title>Mega-Sena IA — Análise com Machine Learning</title>
+  <meta name="description" content="Experimento educacional: um modelo de machine learning treinado com todo o histórico da Mega-Sena, validado contra baselines e contra a teoria da probabilidade." />
+  <meta name="theme-color" content="#07090f" />
+  <meta name="color-scheme" content="dark" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
-  <style>
-    /* ── Variables ─────────────────────────────────────────────── */
-    :root {
-      --bg:       #07090f;
-      --surf:     #0e1220;
-      --surf2:    #141926;
-      --border:   rgba(255,255,255,0.07);
-      --border2:  rgba(255,255,255,0.13);
-      --gold:     #f6c549;
-      --gold-d:   #d4a017;
-      --gold-bg:  rgba(246,197,73,0.08);
-      --gold-bdr: rgba(246,197,73,0.25);
-      --green:    #22d3a0;
-      --red:      #f87171;
-      --blue:     #60a5fa;
-      --purple:   #a78bfa;
-      --text:     #f1f5f9;
-      --sub:      #94a3b8;
-      --muted:    #475569;
-      --r:        14px;
-      --r-sm:     8px;
-    }
-
-    /* ── Reset ─────────────────────────────────────────────────── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      line-height: 1.6;
-      min-height: 100vh;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    /* ── Loading ───────────────────────────────────────────────── */
-    #loading {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      gap: 20px;
-      color: var(--sub);
-      font-size: 15px;
-    }
-    .spinner {
-      width: 44px; height: 44px;
-      border: 3px solid var(--border2);
-      border-top-color: var(--gold);
-      border-radius: 50%;
-      animation: spin 0.75s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* ── App ───────────────────────────────────────────────────── */
-    #app { display: none; }
-    #app.ready { display: block; animation: fadeIn 0.4s ease; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; } }
-
-    .container { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
-
-    section { padding: 72px 0; }
-    section + section { border-top: 1px solid var(--border); }
-
-    /* ── Hero ──────────────────────────────────────────────────── */
-    .hero {
-      position: relative; overflow: hidden;
-      min-height: 92vh;
-      display: flex; align-items: center;
-      text-align: center;
-      padding: 100px 0 80px;
-    }
-    .hero > .container { position: relative; z-index: 1; width: 100%; }
-
-    /* Aurora background */
-    .hero-bg { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
-    .aurora-orb {
-      position: absolute; border-radius: 50%;
-      filter: blur(110px); opacity: 0.11;
-      will-change: transform;
-      animation: aurora var(--dur, 13s) ease-in-out infinite alternate;
-    }
-    @keyframes aurora {
-      from { transform: translate(0, 0) scale(1); }
-      to   { transform: translate(var(--tx, 6%), var(--ty, 6%)) scale(1.1); }
-    }
-
-    /* Cursor glow */
-    .hero-glow {
-      position: absolute; pointer-events: none; z-index: 1;
-      transform: translate(-50%, -50%);
-      opacity: 0; transition: opacity 0.35s ease;
-    }
-    .hero-glow.visible { opacity: 1; }
-    .hero-glow-outer {
-      position: absolute; border-radius: 50%;
-      width: 560px; height: 560px;
-      top: 50%; left: 50%; transform: translate(-50%, -50%);
-      background: radial-gradient(circle, rgba(246,197,73,0.09) 0%, rgba(246,197,73,0.03) 40%, transparent 70%);
-    }
-    .hero-glow-inner {
-      position: absolute; border-radius: 50%;
-      width: 180px; height: 180px;
-      top: 50%; left: 50%; transform: translate(-50%, -50%);
-      background: radial-gradient(circle, rgba(255,240,160,0.18) 0%, rgba(246,197,73,0.08) 45%, transparent 70%);
-      filter: blur(2px);
-    }
-
-    /* Floating balls */
-    .hero-ball-wrap { position: absolute; will-change: transform; }
-    .hero-ball-bg {
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 800; user-select: none;
-      background: radial-gradient(circle at 37% 33%, #fff8e0 0%, #f6c549 50%, #9a5c08 100%);
-      box-shadow: 0 2px 12px rgba(0,0,0,0.4), inset 0 1px 3px rgba(255,255,255,0.55);
-      color: #1a0e00;
-      will-change: transform;
-      animation: hero-float var(--dur, 5s) var(--delay, 0s) ease-in-out infinite alternate;
-      transition: box-shadow 0.2s, opacity 0.2s;
-    }
-    .hero-ball-bg:hover {
-      opacity: 1 !important;
-      box-shadow: 0 0 22px rgba(246,197,73,0.55), 0 4px 14px rgba(0,0,0,0.5),
-                  inset 0 1px 3px rgba(255,255,255,0.7);
-    }
-    @keyframes hero-float {
-      from { transform: translateY(0) rotate(0deg); }
-      to   { transform: translateY(var(--dy, -10px)) rotate(var(--dr, 5deg)); }
-    }
-
-    /* Title shimmer */
-    .hero-badge { animation: hero-rise 0.7s 0s cubic-bezier(.22,1,.36,1) both; }
-    .hero h1 {
-      font-size: clamp(40px, 7vw, 80px);
-      font-weight: 900; letter-spacing: -0.03em; line-height: 1.05;
-      background: linear-gradient(
-        90deg,
-        #e2e8f0 0%, #ffffff 15%,
-        #f6c549 30%, #fff4c2 42%,
-        #ffffff 50%,
-        #fff4c2 58%, #f6c549 70%,
-        #ffffff 85%, #d97706 100%
-      );
-      background-size: 250% auto;
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text;
-      margin-bottom: 20px;
-      animation:
-        title-shimmer 6s linear infinite,
-        hero-rise 0.9s 0.1s cubic-bezier(.22,1,.36,1) both;
-    }
-    @keyframes title-shimmer {
-      0%   { background-position: 140% center; }
-      100% { background-position: -60% center; }
-    }
-    @keyframes hero-rise {
-      from { opacity: 0; transform: translateY(28px) scale(0.97); }
-      to   { opacity: 1; transform: none; }
-    }
-    .hero p {
-      color: var(--sub); font-size: 17px; max-width: 520px;
-      margin: 0 auto 40px;
-      animation: hero-rise 0.7s 0.28s cubic-bezier(.22,1,.36,1) both;
-    }
-    .meta-pills {
-      display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
-      animation: hero-rise 0.7s 0.44s cubic-bezier(.22,1,.36,1) both;
-    }
-    .meta-pill {
-      background: var(--surf); border: 1px solid var(--border2);
-      border-radius: 999px; padding: 6px 16px;
-      font-size: 13px; color: var(--sub);
-    }
-    .meta-pill strong { color: var(--text); font-weight: 600; }
-
-    /* ── Section header ────────────────────────────────────────── */
-    .sec-hd { margin-bottom: 36px; }
-    .sec-hd h2 {
-      font-size: 26px; font-weight: 800;
-      letter-spacing: -0.02em; margin-bottom: 8px;
-    }
-    .sec-hd p { color: var(--sub); font-size: 14px; }
-
-    /* ── Quick stats ───────────────────────────────────────────── */
-    .qs-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-      gap: 14px;
-    }
-    .qs-card {
-      background: var(--surf); border: 1px solid var(--border);
-      border-radius: var(--r); padding: 24px 20px; text-align: center;
-      transition: border-color .2s, transform .2s;
-    }
-    .qs-card:hover { border-color: var(--gold-bdr); transform: translateY(-3px); }
-    .qs-val {
-      font-size: 34px; font-weight: 900; letter-spacing: -0.03em;
-      line-height: 1; color: var(--gold); margin-bottom: 8px;
-      font-variant-numeric: tabular-nums;
-    }
-    .qs-lbl { font-size: 12px; color: var(--sub); font-weight: 500; }
-
-    /* ── Lottery balls ─────────────────────────────────────────── */
-    .ball {
-      width: 46px; height: 46px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 800; font-size: 15px; flex-shrink: 0;
-      background: radial-gradient(circle at 37% 33%, #fff8e0 0%, var(--gold) 50%, #a0620a 100%);
-      color: #1a0e00;
-      box-shadow:
-        0 3px 10px rgba(0,0,0,0.6),
-        inset 0 1px 3px rgba(255,255,255,0.8),
-        inset 0 -2px 4px rgba(0,0,0,0.35);
-      transition: transform .15s;
-      cursor: default;
-    }
-    .ball:hover { transform: scale(1.12) rotate(-4deg); }
-
-    /* ── Combinations ──────────────────────────────────────────── */
-    .combo-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-      gap: 14px;
-    }
-    .combo-card {
-      background: var(--surf); border: 1px solid var(--border);
-      border-radius: var(--r); padding: 20px;
-      display: flex; flex-direction: column; gap: 16px;
-      transition: border-color .2s, box-shadow .2s, transform .2s;
-    }
-    .combo-card:hover {
-      border-color: var(--gold-bdr);
-      box-shadow: 0 8px 32px rgba(246,197,73,0.07);
-      transform: translateY(-2px);
-    }
-    .combo-card.rank-1 {
-      border-color: var(--gold-bdr);
-      background: linear-gradient(135deg, rgba(246,197,73,0.06), var(--surf));
-    }
-    .combo-top { display: flex; align-items: center; justify-content: space-between; }
-    .combo-rank {
-      width: 26px; height: 26px; border-radius: 50%;
-      background: var(--surf2);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 11px; font-weight: 700; color: var(--sub);
-    }
-    .combo-card.rank-1 .combo-rank { background: var(--gold); color: #000; }
-    .combo-score-txt { font-size: 12px; color: var(--muted); }
-    .combo-score-txt span { color: var(--green); font-weight: 700; font-size: 13px; }
-    .balls { display: flex; gap: 7px; flex-wrap: wrap; }
-    .score-bar { height: 3px; background: var(--surf2); border-radius: 2px; overflow: hidden; }
-    .score-bar-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--green), var(--gold));
-      border-radius: 2px;
-    }
-
-    /* ── Frequency heatmap ─────────────────────────────────────── */
-    .freq-legend {
-      display: flex; align-items: center; gap: 12px; margin-bottom: 18px;
-    }
-    .freq-legend-bar {
-      flex: 1; height: 8px; border-radius: 4px;
-      background: linear-gradient(90deg, #1d4ed8, #22d3a0, #f6c549, #ef4444);
-    }
-    .freq-legend span { font-size: 12px; color: var(--muted); }
-
-    .freq-heatmap {
-      display: grid;
-      grid-template-columns: repeat(10, 1fr);
-      gap: 6px;
-    }
-    .freq-cell {
-      aspect-ratio: 1; border-radius: var(--r-sm);
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      cursor: default; position: relative;
-      transition: transform .15s, z-index 0s;
-    }
-    .freq-cell:hover { transform: scale(1.18); z-index: 5; }
-    .freq-cell .fc-n { font-size: 14px; font-weight: 800; line-height: 1; }
-    .freq-cell .fc-f { font-size: 9px; font-weight: 500; opacity: 0.75; margin-top: 2px; }
-
-    /* ── Stats row ─────────────────────────────────────────────── */
-    .stats-row {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 16px;
-    }
-    .info-card {
-      background: var(--surf); border: 1px solid var(--border);
-      border-radius: var(--r); padding: 24px;
-    }
-    .info-card h3 {
-      font-size: 11px; font-weight: 700; color: var(--muted);
-      text-transform: uppercase; letter-spacing: 0.09em;
-      margin-bottom: 20px;
-    }
-
-    /* Even / Odd */
-    .split-bar {
-      height: 10px; border-radius: 5px; overflow: hidden;
-      display: flex; margin-bottom: 14px;
-    }
-    .split-even { background: var(--blue); }
-    .split-odd  { background: var(--purple); flex: 1; }
-    .split-labels { display: flex; justify-content: space-between; font-size: 13px; }
-    .label-even { color: var(--blue); font-weight: 700; }
-    .label-odd  { color: var(--purple); font-weight: 700; }
-    .label-pct  { color: var(--sub); }
-    .split-note {
-      font-size: 12px; color: var(--muted); margin-top: 16px;
-      padding: 10px 12px; background: var(--surf2);
-      border-radius: var(--r-sm); line-height: 1.5;
-    }
-
-    /* Decades */
-    .decade-row {
-      display: flex; align-items: center; gap: 10px; margin-bottom: 11px;
-    }
-    .decade-lbl {
-      font-size: 12px; color: var(--sub); font-weight: 600;
-      width: 44px; flex-shrink: 0;
-      font-family: 'JetBrains Mono', monospace;
-    }
-    .decade-bar-wrap {
-      flex: 1; height: 7px; background: var(--surf2);
-      border-radius: 4px; overflow: hidden;
-    }
-    .decade-bar-fill {
-      height: 100%; background: var(--gold);
-      border-radius: 4px; transition: width 1s cubic-bezier(.4,0,.2,1);
-    }
-    .decade-pct {
-      font-size: 12px; color: var(--sub); width: 38px;
-      text-align: right; flex-shrink: 0;
-    }
-
-    /* Sum stats */
-    .sum-big {
-      font-size: 52px; font-weight: 900; color: var(--gold);
-      letter-spacing: -0.03em; line-height: 1;
-      text-align: center; margin-bottom: 4px;
-    }
-    .sum-caption {
-      text-align: center; font-size: 12px; color: var(--muted); margin-bottom: 20px;
-    }
-    .sum-trio {
-      display: flex; justify-content: space-between;
-      background: var(--surf2); border-radius: var(--r-sm); padding: 14px;
-    }
-    .sum-item { text-align: center; }
-    .sum-item-val { font-size: 22px; font-weight: 800; color: var(--text); }
-    .sum-item-lbl { font-size: 11px; color: var(--muted); margin-top: 2px; }
-
-    /* ── Validation ────────────────────────────────────────────── */
-    .val-inner {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      align-items: start;
-    }
-    .auc-card {
-      background: var(--surf); border: 1px solid var(--border);
-      border-radius: var(--r); padding: 32px 24px; text-align: center;
-    }
-    .auc-card h3 {
-      font-size: 11px; font-weight: 700; color: var(--muted);
-      text-transform: uppercase; letter-spacing: 0.09em; margin-bottom: 4px;
-    }
-    .auc-value {
-      font-size: 64px; font-weight: 900; letter-spacing: -0.04em;
-      line-height: 1; color: var(--gold); margin: 16px 0 6px;
-      font-family: 'JetBrains Mono', monospace;
-    }
-    .auc-sub { font-size: 13px; color: var(--sub); margin-bottom: 20px; }
-    .auc-verdict {
-      background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.18);
-      border-radius: var(--r-sm); padding: 14px 16px;
-      font-size: 13px; color: #fca5a5; line-height: 1.6; text-align: left;
-    }
-    .auc-verdict strong { color: var(--red); }
-
-    .feat-card {
-      background: var(--surf); border: 1px solid var(--border);
-      border-radius: var(--r); padding: 24px;
-    }
-    .feat-card h3 {
-      font-size: 11px; font-weight: 700; color: var(--muted);
-      text-transform: uppercase; letter-spacing: 0.09em; margin-bottom: 20px;
-    }
-    .feat-list { display: flex; flex-direction: column; gap: 14px; }
-    .feat-item {}
-    .feat-header {
-      display: flex; justify-content: space-between; margin-bottom: 6px;
-    }
-    .feat-name { font-size: 13px; font-weight: 600; color: var(--text); }
-    .feat-val  { font-size: 13px; color: var(--sub); font-family: 'JetBrains Mono', monospace; }
-    .feat-bar-wrap {
-      height: 6px; background: var(--surf2);
-      border-radius: 3px; overflow: hidden;
-    }
-    .feat-bar-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--purple), var(--blue));
-      border-radius: 3px;
-      transition: width 1s cubic-bezier(.4,0,.2,1);
-    }
-
-    /* ── Update button ─────────────────────────────────────────── */
-    .update-btn {
-      display: inline-flex; align-items: center; gap: 8px;
-      background: var(--surf); border: 1px solid var(--border2);
-      color: var(--text); font-size: 14px; font-weight: 600;
-      padding: 10px 20px; border-radius: 999px;
-      cursor: pointer; transition: border-color .2s, background .2s, transform .2s;
-      font-family: inherit;
-      margin-top: 20px;
-    }
-    .update-btn:hover:not(:disabled) {
-      border-color: var(--gold-bdr); background: var(--gold-bg);
-      color: var(--gold); transform: translateY(-1px);
-    }
-    .update-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .update-btn .btn-icon { font-size: 16px; line-height: 1; }
-    .update-btn.loading .btn-icon { animation: spin 0.75s linear infinite; display: inline-block; }
-
-    .update-toast {
-      display: none; margin-top: 14px;
-      padding: 10px 18px; border-radius: var(--r-sm);
-      font-size: 13px; font-weight: 500;
-    }
-    .update-toast.ok  { background: rgba(34,211,160,0.1); border: 1px solid rgba(34,211,160,0.25); color: var(--green); }
-    .update-toast.err { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.25); color: var(--red); }
-    .update-toast.show { display: inline-block; }
-
-    /* ── Footer ────────────────────────────────────────────────── */
-    footer {
-      border-top: 1px solid var(--border);
-      padding: 40px 0;
-      text-align: center;
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.8;
-    }
-    footer strong { color: var(--sub); }
-
-    /* ── Build progress banner ──────────────────────────────────── */
-    .build-banner {
-      display: none;
-      position: fixed; top: 56px; left: 0; right: 0; z-index: 99;
-      background: var(--surf2);
-      border-bottom: 1px solid var(--border2);
-      padding: 0 24px;
-    }
-    .build-banner.show { display: block; }
-    .build-banner-inner {
-      max-width: 1180px; margin: 0 auto;
-      display: flex; align-items: center; gap: 14px;
-      height: 44px;
-    }
-    .build-pulse {
-      width: 8px; height: 8px; border-radius: 50%;
-      background: var(--gold); flex-shrink: 0;
-      animation: pulse 1.4s ease-in-out infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50%       { opacity: 0.4; transform: scale(0.7); }
-    }
-    .build-bar-wrap {
-      flex: 1; height: 4px; background: var(--border);
-      border-radius: 2px; overflow: hidden;
-    }
-    .build-bar-fill {
-      height: 100%; border-radius: 2px;
-      background: linear-gradient(90deg, var(--gold), var(--green));
-      transition: width 1s linear;
-    }
-    .build-text { font-size: 13px; color: var(--sub); white-space: nowrap; }
-    .build-text strong { color: var(--text); font-variant-numeric: tabular-nums; }
-    .build-banner.done .build-pulse { background: var(--green); animation: none; }
-    .build-banner.done .build-bar-fill { width: 100% !important; background: var(--green); }
-    .build-banner.error .build-pulse { background: var(--red); animation: none; }
-    .build-banner.error .build-bar-fill { background: var(--red); }
-    .build-banner.error .build-text { color: var(--red); }
-
-    /* ── Validation metrics ─────────────────────────────────────── */
-    .val-extra {
-      background: var(--surf); border: 1px solid var(--border);
-      border-radius: var(--r); padding: 24px; margin-top: 20px;
-    }
-    .val-extra h3 {
-      font-size: 11px; font-weight: 700; color: var(--muted);
-      text-transform: uppercase; letter-spacing: 0.09em; margin-bottom: 14px;
-    }
-    .val-extra h3:not(:first-child) { margin-top: 28px; }
-    .metric-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .metric-table th {
-      text-align: right; font-size: 11px; font-weight: 700; color: var(--muted);
-      text-transform: uppercase; letter-spacing: 0.06em; padding: 6px 10px;
-      border-bottom: 1px solid var(--border2);
-    }
-    .metric-table th:first-child, .metric-table td:first-child { text-align: left; }
-    .metric-table td {
-      text-align: right; padding: 8px 10px; color: var(--sub);
-      border-bottom: 1px solid var(--border);
-      font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums;
-    }
-    .metric-table td:first-child { font-family: inherit; color: var(--text); font-weight: 600; }
-    .metric-table tr.model td:first-child { color: var(--gold); }
-    .val-note { font-size: 12px; color: var(--muted); margin-top: 12px; line-height: 1.6; }
-    .strat-ci { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; margin-top: 3px; }
-    .strat-expected { opacity: 0.85; border-top: 1px dashed var(--border2); }
-
-    /* ── Balanced combinations ──────────────────────────────────── */
-    .ball-balanced {
-      background: radial-gradient(circle at 37% 33%, #e0fff8 0%, #22d3a0 50%, #0a8066 100%);
-      color: #001a15;
-    }
-    .combo-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
-    .badge {
-      font-size: 11px; font-weight: 600; padding: 3px 9px;
-      border-radius: 999px; border: 1px solid;
-    }
-    .badge-sum    { color: var(--blue);   border-color: rgba(96,165,250,0.3);  background: rgba(96,165,250,0.07); }
-    .badge-even   { color: var(--purple); border-color: rgba(167,139,250,0.3); background: rgba(167,139,250,0.07); }
-    .badge-decade { color: var(--green);  border-color: rgba(34,211,160,0.3);  background: rgba(34,211,160,0.07); }
-
-    /* ── Strategy comparison ─────────────────────────────────────── */
-    .strat-grid { display: flex; flex-direction: column; gap: 10px; }
-    .strat-row {
-      background: var(--surf); border: 1px solid var(--border);
-      border-radius: var(--r); padding: 18px 22px;
-      display: grid;
-      grid-template-columns: 150px 1fr repeat(4, 56px);
-      align-items: center; gap: 16px;
-    }
-    .strat-name { font-weight: 700; font-size: 14px; }
-    .strat-desc { font-size: 11px; color: var(--muted); margin-top: 3px; }
-    .strat-bar-wrap { height: 7px; background: var(--surf2); border-radius: 4px; overflow: hidden; }
-    .strat-bar-fill { height: 100%; border-radius: 4px; transition: width 1s cubic-bezier(.4,0,.2,1); }
-    .strat-stat { text-align: center; }
-    .strat-stat-val { font-size: 17px; font-weight: 800; }
-    .strat-stat-lbl { font-size: 10px; color: var(--muted); margin-top: 1px; }
-    .strat-header {
-      display: grid;
-      grid-template-columns: 150px 1fr repeat(4, 56px);
-      gap: 16px; padding: 0 22px 8px;
-      font-size: 10px; font-weight: 700; color: var(--muted);
-      text-transform: uppercase; letter-spacing: 0.07em;
-    }
-    .insight-box {
-      margin-top: 16px; padding: 16px 20px;
-      background: rgba(34,211,160,0.06); border: 1px solid rgba(34,211,160,0.2);
-      border-radius: var(--r); font-size: 14px; color: var(--sub); line-height: 1.7;
-    }
-    .insight-box strong { color: var(--green); }
-    @media (max-width: 700px) {
-      .strat-row    { grid-template-columns: 1fr 1fr; gap: 10px; }
-      .strat-header { display: none; }
-    }
-
-    /* ── Topbar ─────────────────────────────────────────────────── */
-    .topbar {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-      height: 56px;
-      background: rgba(7,9,15,0.85);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0 24px;
-    }
-    .topbar-logo {
-      font-size: 15px; font-weight: 800; letter-spacing: -0.01em;
-      background: linear-gradient(90deg, #fff, var(--gold));
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .topbar-right { display: flex; align-items: center; gap: 10px; }
-
-    body { padding-top: 56px; }
-
-    /* ── Responsive ────────────────────────────────────────────── */
-    @media (max-width: 700px) {
-      .combo-grid { grid-template-columns: 1fr; }
-      .val-inner  { grid-template-columns: 1fr; }
-      .freq-heatmap { grid-template-columns: repeat(6, 1fr); }
-      .ball { width: 40px; height: 40px; font-size: 13px; }
-      .auc-value { font-size: 48px; }
-    }
-    @media (max-width: 420px) {
-      .freq-heatmap { grid-template-columns: repeat(5, 1fr); }
-    }
-  </style>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
+<a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
+
 <!-- ── Topbar ────────────────────────────────────────────────────── -->
-<nav class="topbar">
+<header class="topbar">
   <div class="topbar-logo">Mega-Sena IA</div>
   <div class="topbar-right">
-    <button class="update-btn" id="update-btn" onclick="triggerBuild()">
-      <span class="btn-icon">↻</span> Atualizar Analise
+    <button type="button" class="update-btn" id="update-btn">
+      <span class="btn-icon" aria-hidden="true">↻</span> Atualizar análise
     </button>
-    <div class="update-toast" id="update-toast"></div>
+    <div class="update-toast" id="update-toast" role="alert"></div>
   </div>
-</nav>
+</header>
 
 <!-- ── Build progress banner ─────────────────────────────────────── -->
 <div class="build-banner" id="build-banner">
   <div class="build-banner-inner">
-    <div class="build-pulse" id="build-pulse"></div>
-    <div class="build-bar-wrap">
+    <div class="build-pulse" id="build-pulse" aria-hidden="true"></div>
+    <div class="build-bar-wrap" aria-hidden="true">
       <div class="build-bar-fill" id="build-bar" style="width:0%"></div>
     </div>
-    <div class="build-text" id="build-text">Iniciando build...</div>
+    <div class="build-text" id="build-text" role="status">Iniciando build...</div>
   </div>
 </div>
 
 <!-- ── Loading ──────────────────────────────────────────────────── -->
-<div id="loading">
-  <div class="spinner"></div>
-  <span>Carregando analise da Mega-Sena...</span>
+<div id="loading" role="status">
+  <div class="spinner" aria-hidden="true"></div>
+  <span>Carregando análise da Mega-Sena...</span>
 </div>
+
+<noscript><p>Esta página precisa de JavaScript para exibir a análise.</p></noscript>
 
 <!-- ── App ──────────────────────────────────────────────────────── -->
 <div id="app">
+<main id="conteudo" tabindex="-1">
 
   <!-- Hero -->
-  <section class="hero">
-    <div class="hero-bg" id="hero-bg"></div>
-    <div class="hero-glow" id="hero-glow">
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="hero-bg" id="hero-bg" aria-hidden="true"></div>
+    <div class="hero-glow" id="hero-glow" aria-hidden="true">
       <div class="hero-glow-outer"></div>
       <div class="hero-glow-inner"></div>
     </div>
     <div class="container">
       <div class="hero-badge">Machine Learning · Projeto Educacional</div>
-      <h1>Mega-Sena IA</h1>
-      <p>Analise estatistica do historico completo com Gradient Boosting e validacao temporal honesta.</p>
+      <h1 id="hero-title">Mega-Sena IA</h1>
+      <p>Análise estatística do histórico completo com Gradient Boosting e validação temporal honesta.</p>
       <div class="meta-pills" id="meta-pills"></div>
     </div>
   </section>
 
   <!-- Quick Stats -->
-  <section>
+  <section aria-labelledby="qs-title">
     <div class="container">
-      <div class="qs-grid" id="qs-grid"></div>
+      <h2 id="qs-title" class="sr-only">Resumo</h2>
+      <div class="qs-grid" id="qs-grid" role="list"></div>
     </div>
   </section>
 
   <!-- Combinations -->
-  <section>
+  <section aria-labelledby="combo-title">
     <div class="container">
       <div class="sec-hd">
-        <h2>Top 10 Combinacoes</h2>
-        <p>Geradas por amostragem ponderada pelas probabilidades estimadas pelo modelo treinado com todo o historico.</p>
+        <h2 id="combo-title">Top 10 combinações</h2>
+        <p>Geradas por amostragem ponderada pelas probabilidades estimadas pelo modelo treinado com todo o histórico. Elas não têm mais chance de sair do que qualquer outro jogo.</p>
       </div>
-      <div class="combo-grid" id="combo-grid"></div>
+      <ol class="combo-grid" id="combo-grid"></ol>
     </div>
   </section>
 
   <!-- Balanced Combinations -->
-  <section>
+  <section aria-labelledby="balanced-title">
     <div class="container">
       <div class="sec-hd">
-        <h2>Combinacoes Balanceadas</h2>
-        <p>Geradas com criterios estatisticos — soma 110-230, 2-4 pares, max. 1 consecutivo, min. 3 decadas cobertas.</p>
+        <h2 id="balanced-title">Combinações balanceadas</h2>
+        <p>Geradas com critérios estatísticos: soma entre 110 e 230, de 2 a 4 pares, no máximo 1 par consecutivo e pelo menos 3 décadas.</p>
       </div>
-      <div class="combo-grid" id="balanced-grid"></div>
+      <ol class="combo-grid" id="balanced-grid"></ol>
     </div>
   </section>
 
   <!-- Frequency Heatmap -->
-  <section>
+  <section aria-labelledby="freq-title">
     <div class="container">
       <div class="sec-hd">
-        <h2>Frequencia por Numero</h2>
-        <p>Todos os 60 numeros coloridos por frequencia historica. Passe o mouse para ver detalhes.</p>
+        <h2 id="freq-title">Frequência por número</h2>
+        <p>Os 60 números coloridos pela frequência histórica. Toque ou passe o mouse em um número para ver os detalhes; no teclado, use as setas.</p>
       </div>
-      <div class="freq-legend">
+      <div class="freq-legend" aria-hidden="true">
         <span>Baixa</span>
         <div class="freq-legend-bar"></div>
         <span>Alta</span>
       </div>
-      <div class="freq-heatmap" id="freq-heatmap"></div>
+      <div class="freq-heatmap" id="freq-heatmap" role="group" aria-label="Frequência dos números de 1 a 60"></div>
+      <p class="freq-detail" id="freq-detail" aria-live="polite"></p>
     </div>
   </section>
 
   <!-- Stats Row -->
-  <section>
+  <section aria-labelledby="stats-title">
     <div class="container">
       <div class="sec-hd">
-        <h2>Analise Estatistica</h2>
-        <p>Distribuicoes historicas dos sorteios da Mega-Sena desde 1996.</p>
+        <h2 id="stats-title">Análise estatística</h2>
+        <p>Distribuições históricas dos sorteios da Mega-Sena desde 1996.</p>
       </div>
       <div class="stats-row">
         <div class="info-card">
-          <h3>Par vs Impar</h3>
+          <h3>Par vs ímpar</h3>
           <div id="even-odd"></div>
         </div>
         <div class="info-card">
-          <h3>Distribuicao por Decadas</h3>
+          <h3>Distribuição por décadas</h3>
           <div id="decades"></div>
         </div>
         <div class="info-card">
-          <h3>Soma dos 6 Numeros por Sorteio</h3>
+          <h3>Soma dos 6 números por sorteio</h3>
           <div id="sum-stats"></div>
         </div>
       </div>
@@ -724,16 +138,16 @@
   </section>
 
   <!-- Validation -->
-  <section>
+  <section aria-labelledby="val-title">
     <div class="container">
       <div class="sec-hd">
-        <h2>Transparencia do Modelo</h2>
-        <p>O modelo realmente aprende algo? Validacao temporal honesta com 80% treino / 20% teste.</p>
+        <h2 id="val-title">Transparência do modelo</h2>
+        <p>O modelo realmente aprende algo? Validação temporal com 80% dos sorteios para treino e 20% para teste, e em 5 janelas de tempo.</p>
       </div>
       <div class="val-inner">
         <div class="auc-card" id="auc-card"></div>
         <div class="feat-card">
-          <h3>Importancia das Features</h3>
+          <h3>Importância das features</h3>
           <div class="feat-list" id="feat-list"></div>
         </div>
       </div>
@@ -742,22 +156,24 @@
   </section>
 
   <!-- Strategy Comparison -->
-  <section>
+  <section aria-labelledby="strat-title">
     <div class="container">
       <div class="sec-hd">
-        <h2>Comparacao de Estrategias</h2>
-        <p>Simulacao dos ultimos 500 sorteios reais. Cada estrategia escolheu 6 numeros antes de cada sorteio.</p>
+        <h2 id="strat-title">Comparação de estratégias</h2>
+        <p>Simulação dos últimos 500 sorteios reais. Cada estratégia escolheu 6 números antes de cada sorteio.</p>
       </div>
       <div id="strat-content"></div>
     </div>
   </section>
 
+</main>
+
   <footer>
     <div class="container">
       <p>
-        <strong>Aviso:</strong> Este e um projeto educacional. Loterias sao processos aleatorios por design.<br>
-        Nenhum modelo de machine learning consegue prever resultados futuros — AUC ~ 0.5 confirma isso.<br><br>
-        Dataset: Kaggle &nbsp;·&nbsp; Modelo: GradientBoostingClassifier (scikit-learn) &nbsp;·&nbsp;
+        <strong>Aviso:</strong> Este é um projeto educacional. Loterias são processos aleatórios por design.<br>
+        Nenhum modelo de machine learning consegue prever resultados futuros — AUC ~ 0,5 confirma isso.<br><br>
+        Dados: Kaggle + API de resultados da Caixa &nbsp;·&nbsp; Modelo: GradientBoostingClassifier (scikit-learn) &nbsp;·&nbsp;
         Gerado em: <span id="gen-date">—</span>
       </p>
     </div>
@@ -765,658 +181,6 @@
 
 </div><!-- #app -->
 
-<script>
-  // ── Hero: aurora + balls + mouse physics + parallax ────────────
-  (function initHero() {
-    const bg     = document.getElementById('hero-bg');
-    const heroEl = document.querySelector('.hero');
-    if (!bg || !heroEl) return;
-
-    // ── Aurora orbs ──────────────────────────────────────────────
-    const AURORA = [
-      { w:700, h:520, x:-8,  y:-35, c:'#f6c549', dur:14, tx:'7%',  ty:'9%',  spd:0.07, depth:0.50 },
-      { w:560, h:560, x:58,  y:-15, c:'#7c3aed', dur:18, tx:'-7%', ty:'6%',  spd:0.04, depth:0.30 },
-      { w:440, h:440, x:22,  y:42,  c:'#1d4ed8', dur:11, tx:'5%',  ty:'-7%', spd:0.06, depth:0.40 },
-      { w:320, h:320, x:72,  y:55,  c:'#059669', dur:16, tx:'-4%', ty:'5%',  spd:0.05, depth:0.20 },
-    ];
-    const auroras = AURORA.map(a => {
-      const el = document.createElement('div');
-      el.className = 'aurora-orb';
-      el.style.cssText = `width:${a.w}px;height:${a.h}px;left:${a.x}%;top:${a.y}%;background:${a.c};--dur:${a.dur}s;--tx:${a.tx};--ty:${a.ty}`;
-      bg.appendChild(el);
-      return { el, spd: a.spd, depth: a.depth, sy: 0, tx: 0, ty: 0 };
-    });
-
-    // ── Balls ────────────────────────────────────────────────────
-    const BALLS = [
-      { n:10, x:6,  y:14, s:38, o:0.20, dur:4.6, dl:-0.0, dy:-12, dr:8   },
-      { n:23, x:87, y:18, s:28, o:0.14, dur:5.3, dl:-1.2, dy:-9,  dr:-7  },
-      { n:41, x:14, y:62, s:44, o:0.22, dur:3.9, dl:-2.8, dy:-14, dr:11  },
-      { n:52, x:83, y:68, s:24, o:0.11, dur:6.1, dl:-0.5, dy:-7,  dr:-10 },
-      { n:4,  x:44, y:88, s:40, o:0.16, dur:4.9, dl:-3.4, dy:-13, dr:6   },
-      { n:33, x:3,  y:44, s:30, o:0.18, dur:5.6, dl:-1.8, dy:-10, dr:-8  },
-      { n:7,  x:91, y:48, s:34, o:0.13, dur:3.6, dl:-0.3, dy:-11, dr:14  },
-      { n:18, x:29, y:8,  s:22, o:0.09, dur:5.9, dl:-2.1, dy:-7,  dr:-5  },
-      { n:59, x:64, y:6,  s:46, o:0.19, dur:4.3, dl:-1.5, dy:-15, dr:9   },
-      { n:36, x:54, y:74, s:26, o:0.12, dur:6.6, dl:-3.0, dy:-8,  dr:-12 },
-      { n:45, x:73, y:32, s:36, o:0.17, dur:5.1, dl:-0.8, dy:-12, dr:7   },
-      { n:2,  x:19, y:80, s:20, o:0.08, dur:4.1, dl:-2.4, dy:-6,  dr:-9  },
-      { n:27, x:38, y:50, s:32, o:0.10, dur:5.7, dl:-1.0, dy:-10, dr:12  },
-      { n:15, x:78, y:85, s:42, o:0.15, dur:3.8, dl:-3.8, dy:-13, dr:-6  },
-    ];
-    const balls = BALLS.map(({ n, x, y, s, o, dur, dl, dy, dr }) => {
-      const wrap = document.createElement('div');
-      wrap.className = 'hero-ball-wrap';
-      wrap.style.cssText = `left:${x}%;top:${y}%`;
-
-      const inner = document.createElement('div');
-      inner.className = 'hero-ball-bg';
-      inner.textContent = n;
-      inner.style.cssText = `width:${s}px;height:${s}px;font-size:${Math.round(s*.38)}px;opacity:${o};--dur:${dur}s;--delay:${dl}s;--dy:${dy}px;--dr:${dr}deg`;
-
-      wrap.appendChild(inner);
-      bg.appendChild(wrap);
-
-      return { el: wrap, bx: x, by: y, spd: 0.08 + s/200,
-               ox:0, oy:0, vx:0, vy:0, sy:0 };
-    });
-
-    // ── Physics constants ────────────────────────────────────────
-    const R_RADIUS = 140, R_FORCE = 5000, SPRING = 0.055, DAMP = 0.76;
-    const TILT = 20; // aurora tilt amplitude px
-
-    // ── State ────────────────────────────────────────────────────
-    let mx = -9999, my = -9999, inHero = false;
-    let loopId = null, scrollY = 0;
-
-    function applyBalls() {
-      balls.forEach(b => {
-        b.el.style.transform = `translateY(${b.sy}px) translate(${b.ox.toFixed(2)}px,${b.oy.toFixed(2)}px)`;
-      });
-    }
-    function applyAuroras() {
-      auroras.forEach(a => {
-        a.el.style.transform = `translateY(${a.sy}px) translate(${a.tx.toFixed(1)}px,${a.ty.toFixed(1)}px)`;
-      });
-    }
-    function atRest() {
-      return balls.every(b =>
-        Math.abs(b.ox) < 0.25 && Math.abs(b.oy) < 0.25 &&
-        Math.abs(b.vx) < 0.08 && Math.abs(b.vy) < 0.08
-      );
-    }
-
-    function physicsLoop() {
-      const rect = heroEl.getBoundingClientRect();
-      balls.forEach(b => {
-        const bx = rect.left + (b.bx / 100) * rect.width  + b.ox;
-        const by = rect.top  + (b.by / 100) * rect.height + b.oy + b.sy;
-        if (inHero) {
-          const dx = bx - mx, dy = by - my;
-          const dist = Math.sqrt(dx*dx + dy*dy);
-          if (dist < R_RADIUS && dist > 1) {
-            const f = R_FORCE / (dist * dist);
-            b.vx += (dx / dist) * f;
-            b.vy += (dy / dist) * f;
-          }
-        }
-        b.vx = (b.vx - SPRING * b.ox) * DAMP;
-        b.vy = (b.vy - SPRING * b.oy) * DAMP;
-        b.ox += b.vx;
-        b.oy += b.vy;
-      });
-      applyBalls();
-      loopId = (!inHero && atRest()) ? null : requestAnimationFrame(physicsLoop);
-    }
-    function startLoop() { if (!loopId) loopId = requestAnimationFrame(physicsLoop); }
-
-    // ── Cursor glow element ──────────────────────────────────────
-    const glowEl = document.getElementById('hero-glow');
-
-    // ── Mouse events ─────────────────────────────────────────────
-    heroEl.addEventListener('mousemove', e => {
-      mx = e.clientX; my = e.clientY;
-      if (!inHero) { inHero = true; startLoop(); }
-
-      // Cursor glow — centered exactly on cursor
-      const rect = heroEl.getBoundingClientRect();
-      const lx = e.clientX - rect.left;
-      const ly = e.clientY - rect.top;
-      glowEl.style.left = lx + 'px';
-      glowEl.style.top  = ly + 'px';
-      glowEl.classList.add('visible');
-
-      // Aurora tilt
-      const cx = (e.clientX - rect.left)  / rect.width  - 0.5;
-      const cy = (e.clientY - rect.top)   / rect.height - 0.5;
-      auroras.forEach(a => {
-        a.tx = cx * TILT * a.depth;
-        a.ty = cy * TILT * a.depth * 0.65;
-      });
-      applyAuroras();
-    }, { passive: true });
-
-    heroEl.addEventListener('mouseleave', () => {
-      mx = -9999; my = -9999; inHero = false;
-      startLoop();
-      glowEl.classList.remove('visible');
-      auroras.forEach(a => {
-        a.tx = 0; a.ty = 0;
-        a.el.style.transition = 'transform 1.4s ease';
-        a.el.style.transform  = `translateY(${a.sy}px)`;
-        setTimeout(() => a.el.style.transition = '', 1400);
-      });
-    }, { passive: true });
-
-    // ── Scroll parallax ──────────────────────────────────────────
-    let sraf = null;
-    window.addEventListener('scroll', () => {
-      if (sraf) return;
-      sraf = requestAnimationFrame(() => {
-        scrollY = window.scrollY;
-        balls.forEach(b => { b.sy = scrollY * b.spd; });
-        auroras.forEach(a => { a.sy = scrollY * a.spd; });
-        if (!loopId) applyBalls();
-        applyAuroras();
-        sraf = null;
-      });
-    }, { passive: true });
-  })();
-
-  // ── Utility: heat color (0=cold/blue → 1=hot/red) ──────────────
-  function heatColor(t) {
-    const stops = [
-      [0,    [29,  78,  216]],
-      [0.35, [34,  211, 160]],
-      [0.65, [246, 197, 73 ]],
-      [1,    [239, 68,  68 ]],
-    ];
-    let i = 0;
-    while (i < stops.length - 2 && t > stops[i + 1][0]) i++;
-    const [t0, c0] = stops[i], [t1, c1] = stops[i + 1];
-    const f = (t - t0) / (t1 - t0);
-    const ch = c0.map((v, j) => Math.round(v + (c1[j] - v) * f));
-    return { bg: `rgb(${ch})`, dark: t > 0.45 };
-  }
-
-  // ── Render ──────────────────────────────────────────────────────
-  function render(d) {
-    const { meta, combinations, numbers, even_odd, decades, sum_stats, consecutive, validation } = d;
-
-    // Meta pills
-    document.getElementById('meta-pills').innerHTML = `
-      <div class="meta-pill"><strong>${meta.total_draws.toLocaleString('pt-BR')}</strong> sorteios</div>
-      <div class="meta-pill"><strong>${meta.date_start}</strong> ate <strong>${meta.date_end}</strong></div>
-      <div class="meta-pill">Gerado em <strong>${meta.generated_at}</strong></div>
-    `;
-    document.getElementById('gen-date').textContent = meta.generated_at;
-
-    // Quick stats
-    const years = new Date(meta.date_end).getFullYear() - new Date(meta.date_start).getFullYear();
-    document.getElementById('qs-grid').innerHTML = [
-      [meta.total_draws.toLocaleString('pt-BR'), 'Sorteios Historicos'],
-      [years + '+',                               'Anos de Dados'],
-      [validation.auc_model.toFixed(4),           'AUC-ROC do Modelo'],
-      [even_odd.even_pct + '%',                   'Numeros Pares Sorteados'],
-      [sum_stats.mean,                             'Soma Media por Sorteio'],
-      [consecutive.none_pct + '%',                'Sorteios Sem Consecutivos'],
-    ].map(([v, l]) => `
-      <div class="qs-card">
-        <div class="qs-val">${v}</div>
-        <div class="qs-lbl">${l}</div>
-      </div>
-    `).join('');
-
-    // Combinations
-    const maxS = combinations[0].score;
-    const minS = combinations[combinations.length - 1].score;
-    const rng  = maxS - minS || 0.001;
-    document.getElementById('combo-grid').innerHTML = combinations.map((c, i) => {
-      const bw = (((c.score - minS) / rng) * 65 + 35).toFixed(1);
-      return `
-        <div class="combo-card ${i === 0 ? 'rank-1' : ''}">
-          <div class="combo-top">
-            <div class="combo-rank">${i + 1}</div>
-            <div class="combo-score-txt">Score <span>${c.score.toFixed(4)}</span></div>
-          </div>
-          <div class="balls">${c.numbers.map(n => `<div class="ball">${n}</div>`).join('')}</div>
-          <div class="score-bar"><div class="score-bar-fill" style="width:${bw}%"></div></div>
-        </div>
-      `;
-    }).join('');
-
-    // Frequency heatmap
-    const freqs = numbers.map(n => n.freq);
-    const fMin = Math.min(...freqs), fMax = Math.max(...freqs);
-    document.getElementById('freq-heatmap').innerHTML = numbers.map(n => {
-      const t = (n.freq - fMin) / (fMax - fMin);
-      const { bg, dark } = heatColor(t);
-      const fg = dark ? '#000' : '#fff';
-      return `
-        <div class="freq-cell" style="background:${bg};color:${fg}"
-             title="Numero ${n.n}: ${n.freq}x (${n.pct}%) | Atraso atual: ${n.delay}">
-          <div class="fc-n">${n.n}</div>
-          <div class="fc-f">${n.freq}x</div>
-        </div>
-      `;
-    }).join('');
-
-    // Even / Odd
-    document.getElementById('even-odd').innerHTML = `
-      <div class="split-bar">
-        <div class="split-even" style="width:${even_odd.even_pct}%"></div>
-        <div class="split-odd"></div>
-      </div>
-      <div class="split-labels">
-        <div><span class="label-even">Pares</span> <span class="label-pct">${even_odd.even_pct}%</span></div>
-        <div><span class="label-odd">Impares</span> <span class="label-pct">${even_odd.odd_pct}%</span></div>
-      </div>
-      <div class="split-note">
-        Esperado por acaso: ~50% / ~50%.<br>
-        Distribuicao uniforme confirma aleatoriedade.
-      </div>
-    `;
-
-    // Decades
-    const maxPct = Math.max(...decades.map(d => d.pct));
-    document.getElementById('decades').innerHTML = decades.map(d => `
-      <div class="decade-row">
-        <div class="decade-lbl">${d.label}</div>
-        <div class="decade-bar-wrap">
-          <div class="decade-bar-fill" style="width:${(d.pct / maxPct * 100).toFixed(1)}%"></div>
-        </div>
-        <div class="decade-pct">${d.pct}%</div>
-      </div>
-    `).join('');
-
-    // Sum stats
-    document.getElementById('sum-stats').innerHTML = `
-      <div class="sum-big">${sum_stats.mean}</div>
-      <div class="sum-caption">media da soma dos 6 numeros</div>
-      <div class="sum-trio">
-        <div class="sum-item">
-          <div class="sum-item-val">${sum_stats.min}</div>
-          <div class="sum-item-lbl">Minimo</div>
-        </div>
-        <div class="sum-item">
-          <div class="sum-item-val">±${sum_stats.std}</div>
-          <div class="sum-item-lbl">Desvio</div>
-        </div>
-        <div class="sum-item">
-          <div class="sum-item-val">${sum_stats.max}</div>
-          <div class="sum-item-lbl">Maximo</div>
-        </div>
-      </div>
-    `;
-
-    // AUC card
-    const diff = (validation.auc_model - validation.auc_baseline).toFixed(4);
-    const sign = diff >= 0 ? '+' : '';
-    document.getElementById('auc-card').innerHTML = `
-      <h3>AUC-ROC — Validacao Temporal</h3>
-      <div class="auc-value">${validation.auc_model.toFixed(4)}</div>
-      <div class="auc-sub">
-        Treino: ${validation.train_draws.toLocaleString('pt-BR')} sorteios
-        &nbsp;·&nbsp;
-        Teste: ${validation.test_draws.toLocaleString('pt-BR')} sorteios
-      </div>
-      <div class="auc-verdict">
-        Diferenca vs baseline constante: <strong>${sign}${diff}</strong><br><br>
-        AUC proximo de 0.5 significa que o modelo <strong>nao supera o acaso</strong>.
-        Isso e esperado e confirma a integridade estatistica da loteria.
-      </div>
-    `;
-
-    renderValidationExtra(validation);
-
-    // Feature importance
-    const maxImp = validation.feature_importance[0].value;
-    document.getElementById('feat-list').innerHTML = validation.feature_importance.map(f => `
-      <div class="feat-item">
-        <div class="feat-header">
-          <span class="feat-name">${f.name}</span>
-          <span class="feat-val">${(f.value * 100).toFixed(1)}%</span>
-        </div>
-        <div class="feat-bar-wrap">
-          <div class="feat-bar-fill" style="width:${(f.value / maxImp * 100).toFixed(1)}%"></div>
-        </div>
-      </div>
-    `).join('');
-
-    // Balanced combinations & strategies
-    renderBalanced(d.balanced_combinations);
-    renderStrategies(d.strategies);
-
-    // Show app
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('app').classList.add('ready');
-  }
-
-  // ── Render balanced combinations ────────────────────────────────
-  function renderBalanced(items) {
-    document.getElementById('balanced-grid').innerHTML = items.map((c, i) => `
-      <div class="combo-card ${i === 0 ? 'rank-1' : ''}">
-        <div class="combo-top">
-          <div class="combo-rank">${i + 1}</div>
-          <div class="combo-score-txt">Soma <span>${c.sum}</span></div>
-        </div>
-        <div class="balls">
-          ${c.numbers.map(n => `<div class="ball ball-balanced">${n}</div>`).join('')}
-        </div>
-        <div class="combo-badges">
-          <span class="badge badge-sum">Soma ${c.sum}</span>
-          <span class="badge badge-even">${c.even}P / ${c.odd}I</span>
-          <span class="badge badge-decade">${c.decades} decadas</span>
-        </div>
-      </div>
-    `).join('');
-  }
-
-  // ── Render holdout / walk-forward metrics ────────────────────────
-  function renderValidationExtra(validation) {
-    const box = document.getElementById('val-extra');
-    const hold = validation?.holdout;
-    const wf = validation?.walk_forward;
-    if (!hold && !wf) { box.style.display = 'none'; box.innerHTML = ''; return; }
-
-    const f4 = v => (typeof v === 'number' ? v.toFixed(4) : '—');
-    const PRED = [
-      ['model', 'Modelo', 'model'],
-      ['baseline_constant', 'Baseline constante (p=0.1)', ''],
-      ['baseline_frequency', 'Baseline frequencia', '']
-    ];
-    let html = '';
-
-    if (hold) {
-      const rows = PRED.filter(([k]) => hold[k]).map(([k, label, cls]) => `
-        <tr class="${cls}">
-          <td>${label}</td>
-          <td>${f4(hold[k].auc)}</td>
-          <td>${f4(hold[k].log_loss)}</td>
-          <td>${f4(hold[k].brier)}</td>
-        </tr>`).join('');
-      html += `
-        <h3>Holdout 80/20 — Modelo vs Baselines</h3>
-        <table class="metric-table">
-          <thead><tr><th>Preditor</th><th>AUC</th><th>Log loss</th><th>Brier</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-        <div class="val-note">Menor log loss e Brier = melhor. AUC 0.5 = sem poder preditivo.</div>`;
-    }
-
-    const sum = wf?.summary;
-    if (sum) {
-      const ms = (o) => (o && typeof o.mean === 'number')
-        ? `${o.mean.toFixed(4)} ± ${(o.std ?? 0).toFixed(4)}` : '—';
-      const rows = PRED.filter(([k]) => sum[k]).map(([k, label, cls]) => `
-        <tr class="${cls}">
-          <td>${label}</td>
-          <td>${ms(sum[k].auc)}</td>
-          <td>${ms(sum[k].log_loss)}</td>
-          <td>${ms(sum[k].brier)}</td>
-        </tr>`).join('');
-      html += `
-        <h3>Walk-forward — media ± desvio (${wf.n_folds ?? wf.folds?.length ?? '?'} folds)</h3>
-        <table class="metric-table">
-          <thead><tr><th>Preditor</th><th>AUC</th><th>Log loss</th><th>Brier</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-        <div class="val-note">Janela expansiva: cada fold treina com o passado e testa no bloco seguinte.</div>`;
-    }
-
-    box.innerHTML = html;
-    box.style.display = html ? '' : 'none';
-  }
-
-  // ── Render strategy comparison ───────────────────────────────────
-  function renderStrategies(strat) {
-    const COLORS = {
-      'Aleatoria': 'var(--sub)',   'Quentes': 'var(--red)',
-      'Frias':     'var(--blue)',  'Balanceada': 'var(--green)'
-    };
-    const DESCS = {
-      'Aleatoria':  '6 numeros escolhidos ao acaso',
-      'Quentes':    strat.expected ? 'Os 6 mais frequentes ate o sorteio anterior' : 'Os 6 numeros mais frequentes',
-      'Frias':      strat.expected ? 'Os 6 menos frequentes ate o sorteio anterior' : 'Os 6 numeros menos frequentes',
-      'Balanceada': 'Criterios: soma, paridade, decadas'
-    };
-    const maxAvg = Math.max(...Object.values(strat.results).map(r => r.avg_hits));
-    const expected = strat.expected;
-    const theoreticalNum = expected?.mean_hits ?? (6 * 6 / 60);
-    const theoretical = theoreticalNum.toFixed(3);
-    const ciOf = r => (Array.isArray(r.ci95) && r.ci95.length === 2) ? r.ci95 : null;
-    const hasCi = Object.values(strat.results).every(r => ciOf(r));
-    const inside = r => { const c = ciOf(r); return c && c[0] <= theoreticalNum && theoreticalNum <= c[1]; };
-    const allInside = hasCi && Object.values(strat.results).every(inside);
-    const outside = hasCi ? Object.entries(strat.results).filter(([, r]) => !inside(r)).map(([n]) => n) : [];
-    const ec = expected?.expected_counts;
-    const expRow = ec ? `
-          <div class="strat-row strat-expected">
-            <div>
-              <div class="strat-name" style="color:var(--gold)">Esperado</div>
-              <div class="strat-desc">Teoria (hipergeometrica) em ${strat.draws_tested} sorteios</div>
-            </div>
-            <div>
-              <div style="display:flex;align-items:center;gap:10px">
-                <div class="strat-bar-wrap" style="flex:1">
-                  <div class="strat-bar-fill" style="width:${(theoreticalNum/maxAvg*100).toFixed(1)}%;background:var(--gold)"></div>
-                </div>
-                <span style="font-size:13px;font-variant-numeric:tabular-nums;color:var(--sub);width:36px">${theoretical}</span>
-              </div>
-              ${expected.std_hits != null ? `<div class="strat-ci">desvio por sorteio ${Number(expected.std_hits).toFixed(3)}</div>` : ''}
-            </div>
-            <div class="strat-stat"><div class="strat-stat-val" style="color:var(--sub)">${Number(ec.tres).toFixed(1)}</div><div class="strat-stat-lbl">3 ac.</div></div>
-            <div class="strat-stat"><div class="strat-stat-val" style="color:var(--gold)">${Number(ec.quadra).toFixed(2)}</div><div class="strat-stat-lbl">Quadra</div></div>
-            <div class="strat-stat"><div class="strat-stat-val" style="color:var(--green)">${Number(ec.quina).toFixed(3)}</div><div class="strat-stat-lbl">Quina</div></div>
-            <div class="strat-stat"><div class="strat-stat-val" style="color:var(--red)">${Number(ec.sena) < 0.001 ? '≈0' : Number(ec.sena).toFixed(4)}</div><div class="strat-stat-lbl">Sena</div></div>
-          </div>` : '';
-    const above = hasCi ? Object.entries(strat.results).filter(([, r]) => ciOf(r)[0] > theoreticalNum).map(([n]) => n) : [];
-    const below = outside.filter(n => !above.includes(n));
-    const verdict = !hasCi
-      ? `Nenhuma estrategia superou as outras de forma significativa.`
-      : allInside
-        ? `O valor esperado (${theoretical}) esta dentro do intervalo de confianca de 95% de todas as estrategias:
-        <strong>as diferencas observadas sao indistinguiveis do acaso</strong>.`
-        : [
-            above.length
-              ? `<strong>${above.join(', ')}</strong> ficou acima do esperado (${theoretical}) pelo IC95%.`
-              : `<strong>Nenhuma estrategia acertou significativamente mais que o acaso</strong> (esperado: ${theoretical}).`,
-            below.length
-              ? `${below.join(', ')} ficou abaixo do esperado.`
-              : '',
-            `Com ${Object.keys(strat.results).length} estrategias testadas, um desvio isolado como esse e comum por puro acaso.`
-          ].filter(Boolean).join(' ');
-
-    document.getElementById('strat-content').innerHTML = `
-      <div class="strat-header">
-        <div>Estrategia</div>
-        <div>Media de acertos / sorteio</div>
-        <div style="text-align:center">3 ac.</div>
-        <div style="text-align:center">Quadra</div>
-        <div style="text-align:center">Quina</div>
-        <div style="text-align:center">Sena</div>
-      </div>
-      <div class="strat-grid">
-        ${Object.entries(strat.results).map(([name, r]) => `
-          <div class="strat-row">
-            <div>
-              <div class="strat-name" style="color:${COLORS[name]}">${name}</div>
-              <div class="strat-desc">${DESCS[name]}</div>
-            </div>
-            <div>
-              <div style="display:flex;align-items:center;gap:10px">
-                <div class="strat-bar-wrap" style="flex:1">
-                  <div class="strat-bar-fill" style="width:${(r.avg_hits/maxAvg*100).toFixed(1)}%;background:${COLORS[name]}"></div>
-                </div>
-                <span style="font-size:13px;font-variant-numeric:tabular-nums;color:var(--sub);width:36px">${r.avg_hits}</span>
-              </div>
-              ${ciOf(r) ? `<div class="strat-ci">IC95% [${ciOf(r)[0].toFixed(3)} ; ${ciOf(r)[1].toFixed(3)}]${r.std_hits != null ? ` · desvio ${Number(r.std_hits).toFixed(3)}` : ''}</div>` : ''}
-            </div>
-            <div class="strat-stat"><div class="strat-stat-val" style="color:var(--sub)">${r.tres}</div><div class="strat-stat-lbl">3 ac.</div></div>
-            <div class="strat-stat"><div class="strat-stat-val" style="color:var(--gold)">${r.quadra}</div><div class="strat-stat-lbl">Quadra</div></div>
-            <div class="strat-stat"><div class="strat-stat-val" style="color:var(--green)">${r.quina}</div><div class="strat-stat-lbl">Quina</div></div>
-            <div class="strat-stat"><div class="strat-stat-val" style="color:var(--red)">${r.sena}</div><div class="strat-stat-lbl">Sena</div></div>
-          </div>
-        `).join('')}${expRow}
-      </div>
-      <div class="insight-box">
-        <strong>Conclusao:</strong> Em ${strat.draws_tested} sorteios reais, as estrategias acertaram em media
-        entre <strong>${Math.min(...Object.values(strat.results).map(r => r.avg_hits)).toFixed(3)}</strong> e
-        <strong>${maxAvg.toFixed(3)}</strong> numeros por sorteio — em torno dos ${theoretical} previstos pela teoria da probabilidade (6×6/60).
-        <br><br>
-        ${verdict}
-        <strong>E exatamente o que se espera de um processo aleatorio</strong> —
-        nao existe sistema, metodo ou IA capaz de aumentar suas chances reais de ganhar.
-      </div>
-    `;
-  }
-
-  // ── Build progress ──────────────────────────────────────────────
-  let currentGeneratedAt = null;
-  let pollTimer = null;
-  let elapsedTimer = null;
-  let elapsedSec = 0;
-  // Tempo estimado do build (~2 min de analise + instalacao); a barra vai ate 95% antes de terminar
-  const BUILD_EST = 240;
-  // Abandona o acompanhamento se o build passar deste tempo (segundos)
-  const BUILD_TIMEOUT_SEC = 600;
-
-  function fmt(s) {
-    const m = Math.floor(s / 60), sec = s % 60;
-    return m > 0 ? `${m}m ${String(sec).padStart(2,'0')}s` : `${sec}s`;
-  }
-
-  function showBanner(text) {
-    document.getElementById('build-banner').className = 'build-banner show';
-    document.getElementById('build-text').innerHTML = text;
-  }
-
-  // Unica rotina de limpeza: para timers, reabilita o botao e restaura o icone
-  function stopBuildProgress() {
-    clearInterval(elapsedTimer);
-    clearInterval(pollTimer);
-    elapsedTimer = null;
-    pollTimer = null;
-    const btn = document.getElementById('update-btn');
-    btn.disabled = false;
-    btn.classList.remove('loading');
-    btn.querySelector('.btn-icon').textContent = '↻';
-  }
-
-  function startBuildProgress() {
-    elapsedSec = 0;
-    const banner = document.getElementById('build-banner');
-    const bar    = document.getElementById('build-bar');
-    banner.className = 'build-banner show';
-
-    elapsedTimer = setInterval(() => {
-      elapsedSec++;
-      if (elapsedSec >= BUILD_TIMEOUT_SEC) {
-        stopBuildProgress();
-        const msg = 'O build demorou mais de 10 min. Verifique o painel do Netlify e tente novamente.';
-        banner.className = 'build-banner show error';
-        document.getElementById('build-text').textContent = msg;
-        const toast = document.getElementById('update-toast');
-        toast.textContent = '✗ ' + msg;
-        toast.className = 'update-toast err show';
-        setTimeout(() => {
-          if (banner.classList.contains('error')) banner.className = 'build-banner';
-        }, 10000);
-        return;
-      }
-      const pct = Math.min(95, (elapsedSec / BUILD_EST) * 100).toFixed(1);
-      bar.style.width = pct + '%';
-      document.getElementById('build-text').innerHTML =
-        `Analisando historico e treinando modelo... <strong>${fmt(elapsedSec)}</strong>`;
-    }, 1000);
-
-    // Poll results.json a cada 15s para detectar quando o build terminar
-    pollTimer = setInterval(() => {
-      fetch('./results.json?t=' + Date.now())
-        .then(r => r.json())
-        .then(data => {
-          if (data.meta.generated_at !== currentGeneratedAt) {
-            buildFinished(data);
-          }
-        })
-        .catch(() => {}); // ignora erros durante o build
-    }, 15000);
-  }
-
-  function buildFinished(data) {
-    stopBuildProgress();
-
-    const banner = document.getElementById('build-banner');
-    banner.className = 'build-banner show done';
-    document.getElementById('build-text').innerHTML =
-      `Analise atualizada em <strong>${fmt(elapsedSec)}</strong>!`;
-
-    // Recarrega os dados na pagina
-    render(data);
-    currentGeneratedAt = data.meta.generated_at;
-
-    // Oculta o banner apos 4s
-    setTimeout(() => { banner.className = 'build-banner'; }, 4000);
-  }
-
-  // ── Trigger new build ───────────────────────────────────────────
-  function triggerBuild() {
-    const btn   = document.getElementById('update-btn');
-    const toast = document.getElementById('update-toast');
-
-    stopBuildProgress();
-    document.getElementById('build-banner').className = 'build-banner';
-    btn.disabled = true;
-    btn.classList.add('loading');
-    toast.className = 'update-toast';
-    toast.textContent = '';
-
-    fetch('/.netlify/functions/trigger-build', { method: 'POST' })
-      .then(r => r.json())
-      .then(data => {
-        if (data.ok) {
-          startBuildProgress();
-        } else {
-          toast.textContent = '✗ ' + (data.error || 'Erro desconhecido');
-          toast.className = 'update-toast err show';
-          btn.disabled = false;
-          btn.classList.remove('loading');
-        }
-      })
-      .catch(() => {
-        toast.textContent = '✗ Nao foi possivel conectar. Verifique se esta no Netlify.';
-        toast.className = 'update-toast err show';
-        btn.disabled = false;
-        btn.classList.remove('loading');
-      });
-  }
-
-  // ── Fetch data ──────────────────────────────────────────────────
-  fetch('./results.json')
-    .then(r => {
-      if (!r.ok) throw new Error('not found');
-      return r.json();
-    })
-    .then(data => {
-      currentGeneratedAt = data.meta.generated_at;
-      render(data);
-    })
-    .catch(() => {
-      document.getElementById('loading').innerHTML = `
-        <div style="text-align:center;padding:40px;max-width:480px">
-          <div style="font-size:48px;margin-bottom:20px">⚠️</div>
-          <h2 style="font-size:22px;margin-bottom:12px;color:#f1f5f9">results.json nao encontrado</h2>
-          <p style="color:#64748b;margin-bottom:24px;font-size:14px">
-            Execute o script para gerar os dados antes de abrir a interface:
-          </p>
-          <code style="
-            background:#0e1220;border:1px solid rgba(255,255,255,0.1);
-            border-radius:8px;padding:12px 20px;display:inline-block;
-            font-family:'JetBrains Mono',monospace;font-size:14px;color:#22d3a0
-          ">python generate_results.py</code>
-        </div>
-      `;
-    });
-</script>
+<script src="app.js"></script>
 </body>
 </html>
