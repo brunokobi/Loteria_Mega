@@ -225,3 +225,44 @@ def test_merge_name_variants():
     canon = merge_name_variants(df)
     assert canon['VASCO/RJ'] == canon['VASCO DA GAMA/RJ']  # nunca no mesmo concurso
     assert canon['PORTUGUESA/SP'] != canon['PORTUGUESA SANTIS/SP']  # clubes diferentes
+
+
+# ── programacao oficial do concurso ─────────────────────────────────
+def test_parse_programacao_and_resolve():
+    data = [{'nuConcurso': 1284, 'dataProximoConcurso': '21/11/2026', 'diaSemana': 'Sábado',
+             'dataFimApostas': '21/11/2026', 'horarioFimApostas': '15',
+             'valorEstimadoProximoConcurso': 3500000.0,
+             'listaJogos': [
+                 {'nuSequencial': 2, 'dtJogo': '22/11/2026 00:00:00', 'diaSemana': 'Domingo',
+                  'nomeEquipeUm': 'REAL MADRID', 'siglaUFUm': '', 'nomeEquipeDois': 'CELTA DE VIGO',
+                  'siglaUFDois': ''},
+                 {'nuSequencial': 1, 'dtJogo': '21/11/2026 00:00:00', 'diaSemana': 'Sábado',
+                  'nomeEquipeUm': 'PALMEIRAS', 'siglaUFUm': 'SP', 'nomeEquipeDois': 'FLAMENGO',
+                  'siglaUFDois': 'RJ'}]}]
+    rounds = live.parse_programacao(data)
+    assert rounds[0]['number'] == 1284 and rounds[0]['date'] == '2026-11-21'
+    assert [g['seq'] for g in rounds[0]['games']] == [1, 2]
+    ratings = {'PALMEIRAS/SP': 1600, 'FLAMENGO/RJ': 1620, 'REAL MADRID/ESP': 1700,
+               'CELTA DE VIGO/ESP': 1500, 'BARCELONA/ESP': 1690, 'BARCELONA/BA': 1400}
+    played = {k: 50 for k in ratings}
+    lookup = live.build_team_lookup(set(ratings), {}, ratings, played)
+    g1, g2 = rounds[0]['games']
+    assert live.resolve_team(g1['home'], g1['home_uf'], lookup) == 'PALMEIRAS/SP'
+    assert live.resolve_team(g2['home'], g2['home_uf'], lookup) == 'REAL MADRID/ESP'
+    assert live.resolve_team('BARCELONA', '', lookup) == 'BARCELONA/ESP'  # sem UF: fora do Brasil
+
+
+def test_match_fixture_by_keys_and_names():
+    game = {'date': '2026-11-21', 'home': 'PALMEIRAS', 'away': 'FLAMENGO',
+            'home_key': 'PALMEIRAS/SP', 'away_key': 'FLAMENGO/RJ'}
+    fixtures = [
+        {'start': '2026-11-21T19:30Z', 'home': 'SE Palmeiras SP', 'away': 'CR Flamengo RJ',
+         'home_key': 'PALMEIRAS/SP', 'away_key': 'FLAMENGO/RJ', 'odds': [0.3, 0.3, 0.4]},
+        {'start': '2026-11-21T19:30Z', 'home': 'Santos FC SP', 'away': 'Gremio RS',
+         'home_key': None, 'away_key': None, 'odds': [0.5, 0.3, 0.2]},
+    ]
+    assert live.match_fixture(game, fixtures)['odds'] == [0.3, 0.3, 0.4]
+    no_keys = dict(game, home_key=None, away_key=None)
+    assert live.match_fixture(no_keys, fixtures)['odds'] == [0.3, 0.3, 0.4]  # pelos nomes
+    far = dict(game, date='2026-11-25')
+    assert live.match_fixture(far, fixtures) is None  # data distante

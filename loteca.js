@@ -3,9 +3,9 @@
 // ── Estado ───────────────────────────────────────────────────────
 const OUTCOMES = ['1', 'X', '2'];
 const OUTCOME_LABEL = { '1': 'Mandante', 'X': 'Empate', '2': 'Visitante' };
-const MAX_GAMES = 14;
-const STORAGE_KEY = 'loteca-selecao-v1';
-const state = { data: null, selected: new Map(), doubles: 1, triples: 0 };
+const STORAGE_KEY = 'loteca-aposta-v2';
+const PROGRAMACAO_URL = 'https://servicebus2.caixa.gov.br/portaldeloterias/api/loteca/programacao';
+const state = { data: null, rounds: [], current: 0, doubles: 1, triples: 0 };
 
 // ── Utilitários ──────────────────────────────────────────────────
 const esc = s => String(s ?? '').replace(/[&<>"']/g,
@@ -13,27 +13,17 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g,
 const pct = p => `${Math.round(p * 100)}%`;
 const brl = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtDate = s => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || ''); return m ? `${m[3]}/${m[2]}/${m[1]}` : (s || '—'); };
-const DAY_FMT = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' });
+const WEEKDAY = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', timeZone: 'UTC' });
+const weekdayOf = iso => (iso ? WEEKDAY.format(new Date(`${iso}T12:00:00Z`)) : '');
 const TIME_FMT = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
-const gameId = g => g.id || `${g.start}|${g.home}|${g.away}`;
-const probsOf = g => g.odds || g.elo;
+const UNIFORM = [1 / 3, 1 / 3, 1 / 3];
+const probsOf = g => g.odds || g.elo || UNIFORM;
+const sourceOf = g => (g.odds ? 'Odds Pinnacle' : g.elo ? 'Elo' : 'Sem dados (1/3 cada)');
 
 function oneIn(p) {
   if (p <= 0) return '—';
   const n = 1 / p;
   return n < 10 ? `1 em ${n.toFixed(1).replace('.', ',')}` : `1 em ${Math.round(n).toLocaleString('pt-BR')}`;
-}
-
-// Probabilidades do Elo no navegador (mesmo modelo do Python: regressão logística multinomial)
-function eloProbs(model, home, away) {
-  const d = (home.rating + model.home_adv - away.rating) / 400;
-  const isNew = Math.min(home.games, away.games) < model.new_team_games ? 1 : 0;
-  const x = [d, isNew, d * isNew];
-  const z = model.coef.map((c, i) => c.reduce((s, w, j) => s + w * x[j], model.intercept[i]));
-  const m = Math.max(...z);
-  const e = z.map(v => Math.exp(v - m));
-  const sum = e.reduce((a, b) => a + b, 0);
-  return e.map(v => v / sum);
 }
 
 function probBar(p, label) {
@@ -47,120 +37,138 @@ function probBar(p, label) {
     </div>`;
 }
 
-// ── Persistência da seleção (conveniência; a página funciona sem) ─
-function saveSelection() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      games: [...state.selected.values()], doubles: state.doubles, triples: state.triples,
-    }));
-  } catch (_) { /* armazenamento indisponível */ }
+// ── Elo e times no navegador (quando a programação vem direto da Caixa) ─
+const NAME_ALIASES = { 'S PAULO': 'SAO PAULO', 'S CAETANO': 'SAO CAETANO', 'BRASIL DE PELOTAS': 'BRASIL PELOTAS' };
+function normalizeName(s) {
+  const n = String(s || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toUpperCase()
+    .replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+  return NAME_ALIASES[n] || n;
 }
-function loadSelection() {
+function resolveTeam(name, uf) {
+  const lk = state.data.team_lookup || { by_key: {}, by_name: {} };
+  return uf ? lk.by_key[`${normalizeName(name)}/${normalizeName(uf)}`] || null
+            : lk.by_name[normalizeName(name)] || null;
+}
+function eloProbs(hKey, aKey) {
+  const teams = state.teamsByKey, model = state.data.model;
+  const h = teams.get(hKey), a = teams.get(aKey);
+  if (!h || !a) return null;
+  const d = (h.rating + model.home_adv - a.rating) / 400;
+  const isNew = Math.min(h.games, a.games) < model.new_team_games ? 1 : 0;
+  const x = [d, isNew, d * isNew];
+  const z = model.coef.map((c, i) => c.reduce((s, w, j) => s + w * x[j], model.intercept[i]));
+  const m = Math.max(...z);
+  const e = z.map(v => Math.exp(v - m));
+  const sum = e.reduce((acc, v) => acc + v, 0);
+  return e.map(v => v / sum);
+}
+function oddsFor(game) {
+  if (!game.home_key || !game.away_key || !game.date) return null;
+  const d0 = Date.parse(`${game.date}T12:00:00Z`);
+  const f = (state.data.upcoming || []).find(x => x.home_key === game.home_key && x.away_key === game.away_key
+    && Math.abs(Date.parse(x.start) - d0) <= 2 * 86400000);
+  return f ? { odds: f.odds, odds_tournament: f.tournament, kickoff: f.start } : null;
+}
+const brDate = s => { const m = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(s || ''); return m ? `${m[3]}-${m[2]}-${m[1]}` : null; };
+function roundsFromCaixa(list) {
+  return (list || []).map(c => {
+    const games = (Object.values(c).find(Array.isArray) || []).slice().sort((a, b) => a.nuSequencial - b.nuSequencial);
+    return {
+      number: c.nuConcurso, date: brDate(c.dataProximoConcurso), weekday: c.diaSemana,
+      bets_until: brDate(c.dataFimApostas), bets_until_hour: c.horarioFimApostas,
+      estimated_prize: c.valorEstimadoProximoConcurso,
+      games: games.map(g => {
+        const game = {
+          seq: g.nuSequencial, date: brDate(g.dtJogo), weekday: g.diaSemana,
+          home: (g.nomeEquipeUm || '').trim(), home_uf: (g.siglaUFUm || g.siglaPaisUm || '').trim(),
+          away: (g.nomeEquipeDois || '').trim(), away_uf: (g.siglaUFDois || g.siglaPaisDois || '').trim(),
+        };
+        game.home_key = resolveTeam(game.home, game.home_uf);
+        game.away_key = resolveTeam(game.away, game.away_uf);
+        game.elo = eloProbs(game.home_key, game.away_key);
+        Object.assign(game, oddsFor(game) || { odds: null });
+        return game;
+      }),
+    };
+  }).sort((a, b) => a.number - b.number);
+}
+
+// ── Preferências do montador (conveniência; a página funciona sem) ─
+function savePrefs() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ doubles: state.doubles, triples: state.triples })); } catch (_) { /* indisponível */ }
+}
+function loadPrefs() {
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-    if (!raw) return;
-    const now = Date.now();
-    (raw.games || []).forEach(g => {
-      // descarta jogos que já começaram há mais de 1 dia
-      if (!g.start || Date.parse(g.start) > now - 86400000) state.selected.set(gameId(g), g);
-    });
-    if (Number.isInteger(raw.doubles)) state.doubles = raw.doubles;
-    if (Number.isInteger(raw.triples)) state.triples = raw.triples;
+    if (Number.isInteger(raw?.doubles)) state.doubles = raw.doubles;
+    if (Number.isInteger(raw?.triples)) state.triples = raw.triples;
   } catch (_) { /* ignora */ }
 }
 
 // ── Cabeçalho ────────────────────────────────────────────────────
-function renderMeta(d) {
-  const nr = d.meta.next_round;
+function renderMeta() {
+  const d = state.data, r = state.rounds[0];
+  const next = r ? `<div class="meta-pill">Próximo concurso <strong>${esc(r.number)}</strong> · <strong>${esc(weekdayOf(r.date))}, ${esc(fmtDate(r.date))}</strong></div>` : '';
   document.getElementById('lt-meta').innerHTML = `
-    ${nr?.number ? `<div class="meta-pill">Próximo concurso <strong>${esc(nr.number)}</strong>${nr.date ? ` · <strong>${esc(nr.date)}</strong>` : ''}</div>` : ''}
+    ${next}
     <div class="meta-pill"><strong>${d.meta.rounds.toLocaleString('pt-BR')}</strong> concursos no histórico</div>
     <div class="meta-pill">Gerado em <strong>${esc(fmtDate(d.meta.generated_at))} ${esc(d.meta.generated_at.slice(11))}</strong></div>`;
   document.getElementById('gen-date').textContent = `${fmtDate(d.meta.generated_at)} ${d.meta.generated_at.slice(11)}`;
 }
 
-// ── Jogos dos próximos dias ──────────────────────────────────────
-function renderUpcoming() {
-  const box = document.getElementById('up-list');
-  const games = state.data.upcoming || [];
-  if (!games.length) {
-    box.innerHTML = `<p class="lt-empty">Sem jogos com odds no momento (fora de temporada ou odds indisponíveis no último build). Use o jogo manual abaixo.</p>`;
-    return;
-  }
-  const q = document.getElementById('up-search').value.trim().toLowerCase();
-  const full = state.selected.size >= MAX_GAMES;
-  const shown = games.filter(g => !q || `${g.home} ${g.away} ${g.tournament}`.toLowerCase().includes(q));
-  if (!shown.length) { box.innerHTML = `<p class="lt-empty">Nenhum jogo encontrado para “${esc(q)}”.</p>`; return; }
-
-  let html = '', lastDay = '';
-  shown.forEach(g => {
-    const dt = new Date(g.start);
-    const day = DAY_FMT.format(dt);
-    if (day !== lastDay) { html += `<h3 class="lt-day">${esc(day)}</h3>`; lastDay = day; }
-    const id = gameId(g);
-    const checked = state.selected.has(id);
-    html += `
-      <div class="lt-game${checked ? ' is-selected' : ''}">
-        <label class="lt-check">
-          <input type="checkbox" data-id="${esc(id)}" ${checked ? 'checked' : ''} ${full && !checked ? 'disabled' : ''} />
-          <span class="sr-only">Incluir ${esc(g.home)} x ${esc(g.away)} na aposta</span>
-        </label>
-        <div class="lt-game-info">
-          <div class="lt-game-meta">${esc(TIME_FMT.format(dt))} · ${esc(g.tournament)}</div>
-          <div class="lt-teams">${esc(g.home)} <span aria-hidden="true">×</span><span class="sr-only">contra</span> ${esc(g.away)}</div>
-        </div>
-        <div class="lt-game-probs">
-          ${probBar(g.odds, 'Odds')}
-          <div class="lt-src">Odds Pinnacle${g.elo ? ` · Elo: ${OUTCOMES.map((o, i) => `${o} ${pct(g.elo[i])}`).join(' / ')}` : ''}</div>
-        </div>
-      </div>`;
-  });
-  box.innerHTML = html;
+// ── Concursos e jogos ────────────────────────────────────────────
+function renderTabs() {
+  const tabs = document.getElementById('round-tabs');
+  if (state.rounds.length < 2) { tabs.innerHTML = ''; return; }
+  tabs.innerHTML = state.rounds.map((r, i) => `
+    <button type="button" role="tab" class="lt-tab" id="tab-${i}" data-i="${i}"
+            aria-selected="${i === state.current}" tabindex="${i === state.current ? 0 : -1}">
+      Concurso ${esc(r.number)} <small>${esc(fmtDate(r.date))}</small>
+    </button>`).join('');
 }
 
-function toggleGame(id, on) {
-  if (on) {
-    if (state.selected.size >= MAX_GAMES) return;
-    const g = state.data.upcoming.find(x => gameId(x) === id);
-    if (g) state.selected.set(id, { ...g, source: 'Odds Pinnacle' });
-  } else {
-    state.selected.delete(id);
+function renderRound() {
+  const r = state.rounds[state.current];
+  const info = document.getElementById('round-info');
+  const list = document.getElementById('round-games');
+  if (!r) {
+    info.innerHTML = '';
+    list.innerHTML = `<li class="lt-empty">A programação do próximo concurso ainda não foi publicada pela Caixa ou está indisponível agora. Tente novamente mais tarde.</li>`;
+    return;
   }
-  saveSelection();
-  renderUpcoming();
+  const prize = r.estimated_prize ? ` · prêmio estimado <strong>${brl(r.estimated_prize)}</strong>` : '';
+  const until = r.bets_until ? `apostas até ${esc(weekdayOf(r.bets_until))}, ${esc(fmtDate(r.bets_until))}${r.bets_until_hour ? ` às ${esc(r.bets_until_hour)}h` : ''}` : '';
+  info.innerHTML = `
+    <span class="next-draw-label">Concurso ${esc(r.number)}</span>
+    <strong>${esc(weekdayOf(r.date))}, ${esc(fmtDate(r.date))}</strong>
+    <span class="next-draw-note">${until}${prize}</span>`;
+  const withOdds = r.games.filter(g => g.odds).length;
+  list.innerHTML = r.games.map(g => {
+    const p = probsOf(g);
+    const when = g.kickoff ? `${weekdayOf(g.date)}, ${TIME_FMT.format(new Date(g.kickoff))}` : `${weekdayOf(g.date) || ''} ${fmtDate(g.date)}`;
+    const elo = g.odds && g.elo ? ` · Elo: ${OUTCOMES.map((o, i) => `${o} ${pct(g.elo[i])}`).join(' / ')}` : '';
+    return `
+      <li class="lt-game lt-game-round">
+        <span class="lt-seq" aria-hidden="true">${esc(g.seq)}</span>
+        <div class="lt-game-info">
+          <div class="lt-game-meta"><span class="sr-only">Jogo ${esc(g.seq)}: </span>${esc(when)}${g.odds_tournament ? ` · ${esc(g.odds_tournament)}` : ''}</div>
+          <div class="lt-teams">${esc(g.home)}${g.home_uf ? ` <small>${esc(g.home_uf)}</small>` : ''} <span aria-hidden="true">×</span><span class="sr-only">contra</span> ${esc(g.away)}${g.away_uf ? ` <small>${esc(g.away_uf)}</small>` : ''}</div>
+        </div>
+        <div class="lt-game-probs">
+          ${probBar(p, sourceOf(g))}
+          <div class="lt-src">${esc(sourceOf(g))}${elo}</div>
+        </div>
+      </li>`;
+  }).join('') + `<li class="lt-round-note val-note">${withOdds} de ${r.games.length} jogos com odds; os demais usam o Elo. Odds de jogos mais distantes aparecem conforme as casas publicam.</li>`;
+}
+
+function selectRound(i) {
+  state.current = i;
+  renderTabs();
+  renderRound();
   renderBuilder();
 }
 
-// ── Jogo manual ──────────────────────────────────────────────────
-const teamLabel = t => (t.uf ? `${t.name} (${t.uf})` : t.name);
-
-function setupManual() {
-  const teams = state.data.teams || [];
-  const byLabel = new Map(teams.map(t => [teamLabel(t).toLowerCase(), t]));
-  document.getElementById('team-options').innerHTML =
-    teams.map(t => `<option value="${esc(teamLabel(t))}"></option>`).join('');
-
-  document.getElementById('man-form').addEventListener('submit', e => {
-    e.preventDefault();
-    const msg = document.getElementById('man-msg');
-    const hIn = document.getElementById('man-home'), aIn = document.getElementById('man-away');
-    const home = byLabel.get(hIn.value.trim().toLowerCase());
-    const away = byLabel.get(aIn.value.trim().toLowerCase());
-    if (!home || !away) { msg.textContent = 'Escolha os dois times da lista de sugestões.'; return; }
-    if (home.key === away.key) { msg.textContent = 'Mandante e visitante precisam ser diferentes.'; return; }
-    if (state.selected.size >= MAX_GAMES) { msg.textContent = `Você já escolheu ${MAX_GAMES} jogos.`; return; }
-    const g = {
-      id: `manual|${home.key}|${away.key}`, home: teamLabel(home), away: teamLabel(away),
-      tournament: 'Jogo manual', elo: eloProbs(state.data.model, home, away), source: 'Elo',
-    };
-    state.selected.set(g.id, g);
-    msg.textContent = `${g.home} x ${g.away} adicionado à aposta.`;
-    hIn.value = ''; aIn.value = '';
-    saveSelection();
-    renderUpcoming();
-    renderBuilder();
-  });
-}
 
 // ── Montador de aposta ───────────────────────────────────────────
 // Para cada jogo: simples (resultado mais provável), duplo (2 mais prováveis) ou triplo.
@@ -211,6 +219,8 @@ function hitDistribution(probs) {
   return dist;
 }
 
+
+
 function setupBuilder() {
   const pr = state.data.pricing;
   const dSel = document.getElementById('bet-doubles'), tSel = document.getElementById('bet-triples');
@@ -218,7 +228,7 @@ function setupBuilder() {
   tSel.innerHTML = Array.from({ length: pr.max_triples + 1 }, (_, i) => `<option value="${i}">${i}</option>`).join('');
   dSel.value = Math.min(state.doubles, pr.max_doubles);
   tSel.value = Math.min(state.triples, pr.max_triples);
-  const onChange = () => { state.doubles = +dSel.value; state.triples = +tSel.value; saveSelection(); renderBuilder(); };
+  const onChange = () => { state.doubles = +dSel.value; state.triples = +tSel.value; savePrefs(); renderBuilder(); };
   dSel.addEventListener('change', onChange);
   tSel.addEventListener('change', onChange);
   document.getElementById('bet-note').textContent =
@@ -227,12 +237,13 @@ function setupBuilder() {
 }
 
 function renderBuilder() {
-  const games = [...state.selected.values()];
+  const r = state.rounds[state.current];
+  const games = r ? r.games : [];
   const list = document.getElementById('bet-list');
   const summary = document.getElementById('bet-summary');
   const pr = state.data.pricing;
   if (!games.length) {
-    list.innerHTML = `<p class="lt-empty">Marque os jogos acima ou adicione jogos manualmente (até ${MAX_GAMES}).</p>`;
+    list.innerHTML = `<p class="lt-empty">Sem jogos para montar a aposta.</p>`;
     summary.innerHTML = '';
     return;
   }
@@ -242,19 +253,16 @@ function renderBuilder() {
   const dist = hitDistribution(coverage);
   const n = games.length;
   const pAll = dist[n];
-  const pMinus1 = n >= 1 ? dist[n] + dist[n - 1] : pAll;
+  const p13 = dist[n] + (dist[n - 1] || 0);
   const expected = coverage.reduce((a, b) => a + b, 0);
-  const missing = MAX_GAMES - n;
-  const tooSmall = combos < pr.min_combinations;
 
   summary.innerHTML = `
-    <div class="lt-kpi"><span>${n}/${MAX_GAMES}</span>jogos${missing > 0 ? ` (faltam ${missing})` : ''}</div>
     <div class="lt-kpi"><span>${combos}</span>combinações</div>
     <div class="lt-kpi"><span>${brl(combos * pr.price_per_combination)}</span>custo</div>
-    <div class="lt-kpi"><span>${oneIn(pAll)}</span>chance de acertar ${n === MAX_GAMES ? 'os 14' : `os ${n}`}</div>
-    ${n === MAX_GAMES ? `<div class="lt-kpi"><span>${oneIn(pMinus1)}</span>chance de 13 ou mais</div>` : ''}
+    <div class="lt-kpi"><span>${oneIn(pAll)}</span>chance de acertar os ${n}</div>
+    <div class="lt-kpi"><span>${oneIn(p13)}</span>chance de ${n - 1} ou mais</div>
     <div class="lt-kpi"><span>${expected.toFixed(1).replace('.', ',')}</span>acertos esperados</div>
-    ${tooSmall ? `<p class="lt-warn">A aposta mínima da Loteca exige pelo menos 1 duplo.</p>` : ''}`;
+    ${combos < pr.min_combinations ? `<p class="lt-warn">A aposta mínima da Loteca exige pelo menos 1 duplo.</p>` : ''}`;
 
   list.innerHTML = `
     <ol class="lt-bet">
@@ -264,8 +272,8 @@ function renderBuilder() {
         return `
           <li class="lt-bet-row">
             <div class="lt-bet-game">
-              <div class="lt-teams">${esc(g.home)} <span aria-hidden="true">×</span><span class="sr-only">contra</span> ${esc(g.away)}</div>
-              <div class="lt-game-meta">${esc(g.tournament)} · ${esc(g.source || (g.odds ? 'Odds Pinnacle' : 'Elo'))}</div>
+              <div class="lt-teams"><span class="lt-seq-inline">${esc(g.seq)}</span> ${esc(g.home)} <span aria-hidden="true">×</span><span class="sr-only">contra</span> ${esc(g.away)}</div>
+              <div class="lt-game-meta">${esc(sourceOf(g))}</div>
             </div>
             <div class="lt-picks" role="img" aria-label="${kind}: ${c.picks.map(k => OUTCOME_LABEL[OUTCOMES[k]]).join(' e ')}">
               ${OUTCOMES.map((o, k) => `
@@ -274,11 +282,11 @@ function renderBuilder() {
                 </span>`).join('')}
             </div>
             <div class="lt-bet-cov">${kind}<br><small>${pct(c.q)} de chance</small></div>
-            <button type="button" class="lt-remove" data-id="${esc(gameId(g))}" aria-label="Remover ${esc(g.home)} x ${esc(g.away)}">×</button>
           </li>`;
       }).join('')}
     </ol>`;
 }
+
 
 // ── Teste no histórico ───────────────────────────────────────────
 function renderBacktest(d) {
@@ -338,28 +346,49 @@ function renderBacktest(d) {
     </div>`;
 }
 
+
 // ── Inicialização ────────────────────────────────────────────────
+function applyRounds(rounds) {
+  state.rounds = rounds || [];
+  state.current = Math.min(state.current, Math.max(state.rounds.length - 1, 0));
+  renderMeta();
+  renderTabs();
+  renderRound();
+  renderBuilder();
+}
+
+// A programação é consultada direto na Caixa pelo navegador (a API permite CORS):
+// assim a página mostra o concurso certo mesmo que o build não tenha acessado a Caixa.
+function refreshFromCaixa() {
+  fetch(PROGRAMACAO_URL, { headers: { Accept: 'application/json' } })
+    .then(r => (r.ok ? r.json() : Promise.reject()))
+    .then(list => {
+      const live = roundsFromCaixa(list);
+      if (!live.length) return;
+      const built = state.rounds.map(r => r.number).join(',');
+      if (live.map(r => r.number).join(',') !== built) applyRounds(live);
+    })
+    .catch(() => { /* mantém a programação do build */ });
+}
+
 function init(d) {
   state.data = d;
-  loadSelection();
-  renderMeta(d);
-  setupManual();
+  state.teamsByKey = new Map((d.teams || []).map(t => [t.key, t]));
+  loadPrefs();
   setupBuilder();
-  renderUpcoming();
-  renderBuilder();
+  applyRounds(d.rounds || []);
   renderBacktest(d);
+  refreshFromCaixa();
 
-  document.getElementById('up-search').addEventListener('input', renderUpcoming);
-  document.getElementById('up-list').addEventListener('change', e => {
-    if (e.target.matches('input[type=checkbox]')) toggleGame(e.target.dataset.id, e.target.checked);
-  });
-  document.getElementById('bet-list').addEventListener('click', e => {
-    const b = e.target.closest('.lt-remove');
-    if (!b) return;
-    state.selected.delete(b.dataset.id);
-    saveSelection();
-    renderUpcoming();
-    renderBuilder();
+  const tabs = document.getElementById('round-tabs');
+  tabs.addEventListener('click', e => { const b = e.target.closest('.lt-tab'); if (b) selectRound(+b.dataset.i); });
+  tabs.addEventListener('keydown', e => {
+    const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+    if (!step || state.rounds.length < 2) return;
+    e.preventDefault();
+    const next = (state.current + step + state.rounds.length) % state.rounds.length;
+    selectRound(next);
+    document.getElementById(`tab-${next}`)?.focus();
   });
   document.getElementById('loading').style.display = 'none';
   document.getElementById('app').classList.add('ready');

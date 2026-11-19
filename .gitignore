@@ -6,3 +6,5 @@ __pycache__/
 .ruff_cache/
 .venv/
 loteca.json
+predicoes.json
+update_status.json

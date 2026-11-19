@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Loteca IA — Probabilidades e montador de aposta</title>
-  <meta name="description" content="Probabilidades dos jogos da Loteca com odds da Pinnacle e rating Elo, montador de duplos e triplos e teste do modelo em 1283 concursos." />
+  <meta name="description" content="Os 14 jogos do próximo concurso da Loteca com probabilidades pelas odds da Pinnacle e rating Elo, montador de duplos e triplos e teste do modelo em 1283 concursos." />
   <meta name="theme-color" content="#07090f" />
   <meta name="color-scheme" content="dark" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -39,46 +39,21 @@
     <div class="container">
       <div class="hero-badge">Futebol · Projeto Educacional</div>
       <h1 id="lt-title">Loteca IA</h1>
-      <p>Probabilidade de cada resultado pelas odds da Pinnacle e por um rating Elo treinado com todo o histórico da Loteca. Escolha os 14 jogos e monte duplos e triplos onde há mais incerteza.</p>
+      <p>Os 14 jogos do próximo concurso com a probabilidade de cada resultado, pelas odds da Pinnacle e por um rating Elo treinado com todo o histórico da Loteca. Monte duplos e triplos onde há mais incerteza.</p>
       <div class="meta-pills" id="lt-meta"></div>
     </div>
   </section>
 
-  <!-- Jogos da semana -->
-  <section aria-labelledby="up-title">
+  <!-- Jogos do concurso -->
+  <section aria-labelledby="round-title">
     <div class="container">
       <div class="sec-hd">
-        <h2 id="up-title">Jogos dos próximos dias</h2>
-        <p>Jogos com odds da Pinnacle nas competições que costumam entrar na Loteca. A Caixa não divulga a programação por API: marque os 14 jogos do concurso. Para estaduais e jogos sem odds, adicione o jogo manualmente abaixo.</p>
+        <h2 id="round-title">Jogos do concurso</h2>
+        <p>Os 14 jogos da programação oficial da Caixa. A probabilidade vem das odds da Pinnacle quando o jogo já tem odds e, senão, do rating Elo.</p>
       </div>
-      <div class="lt-filter">
-        <label for="up-search">Filtrar por time ou competição</label>
-        <input id="up-search" type="search" placeholder="Ex.: Flamengo, Premier League" autocomplete="off" />
-      </div>
-      <div id="up-list" class="lt-list"></div>
-    </div>
-  </section>
-
-  <!-- Jogo manual -->
-  <section aria-labelledby="man-title">
-    <div class="container">
-      <div class="sec-hd">
-        <h2 id="man-title">Adicionar jogo manualmente</h2>
-        <p>Para jogos que não aparecem acima. A probabilidade vem só do rating Elo, calculado com o histórico da Loteca.</p>
-      </div>
-      <form id="man-form" class="lt-manual" novalidate>
-        <div>
-          <label for="man-home">Mandante</label>
-          <input id="man-home" list="team-options" placeholder="Digite o time" autocomplete="off" required />
-        </div>
-        <div>
-          <label for="man-away">Visitante</label>
-          <input id="man-away" list="team-options" placeholder="Digite o time" autocomplete="off" required />
-        </div>
-        <button type="submit" class="lt-btn">Adicionar</button>
-        <p class="lt-form-msg" id="man-msg" role="status"></p>
-      </form>
-      <datalist id="team-options"></datalist>
+      <div id="round-tabs" class="lt-tabs" role="tablist" aria-label="Concursos abertos"></div>
+      <div id="round-info" class="next-draw" aria-live="polite"></div>
+      <ol id="round-games" class="lt-list lt-round"></ol>
     </div>
   </section>
 

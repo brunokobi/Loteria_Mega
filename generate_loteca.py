@@ -4,6 +4,7 @@ Roda no build do Netlify depois de generate_results.py. Nunca quebra o build:
 se algo falhar, a aba da Loteca mostra um aviso e o resto do site segue normal.
 """
 import json
+import os
 import warnings
 from pathlib import Path
 
@@ -17,7 +18,7 @@ def main():
     warnings.filterwarnings('ignore')
     try:
         update_csv()
-        data = build_loteca()
+        data = build_loteca(site_url=os.environ.get('URL', 'https://loteriabruno.netlify.app'))
     except Exception as exc:
         print(f"Aviso: loteca.json nao gerado ({exc}).")
         return

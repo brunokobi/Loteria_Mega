@@ -8,9 +8,16 @@ Este documento descreve como a página `loteca.html` calcula as probabilidades, 
 |---|---|---|---|
 | API de resultados da Caixa | Todos os concursos desde 2002: 14 jogos, times, UF e placar | `loteca.csv` · `loteca/update.py` | Grátis, sem cadastro |
 | [football-data.co.uk](https://www.football-data.co.uk) | Odds de fechamento (Pinnacle, Bet365, média do mercado) das ligas europeias desde 2002/03 e da Série A desde 2012 | `loteca_odds.csv` · `loteca/odds_history.py` | Grátis, CSV |
-| [OddsPapi](https://oddspapi.io) | Odds da Pinnacle dos jogos dos próximos dias, inclusive estaduais e Série B | `loteca/live.py` | Plano grátis (250 requisições); ~6 por build |
+| [OddsPapi](https://oddspapi.io) | Odds da Pinnacle dos jogos dos próximos 14 dias, inclusive estaduais e Série B | `loteca/live.py` | Plano grátis (250 requisições); ~6 por build |
+| Programação da Caixa | Os 14 jogos dos concursos abertos | `loteca/live.py::fetch_programacao` | Grátis, sem cadastro |
 
-A Caixa **não publica por API os jogos do próximo concurso**, só os já apurados. Por isso a página lista os jogos dos próximos dias com odds e o usuário marca os 14 do concurso (ou adiciona jogos manualmente).
+A **programação dos próximos concursos** vem de `https://servicebus2.caixa.gov.br/portaldeloterias/api/loteca/programacao`: os 14 jogos de cada concurso aberto, com data, prazo e horário final das apostas e prêmio estimado. A página mostra só esses jogos.
+
+Ordem das fontes para a programação:
+
+1. o build consulta a Caixa e casa cada jogo com o Elo e com as odds da semana;
+2. se a Caixa não responder no build, usa a programação publicada no deploy anterior (se as apostas ainda estiverem abertas);
+3. o navegador também consulta a Caixa (a API permite CORS) e, se o concurso for diferente do publicado, monta os jogos sozinho com as tabelas de times (`team_lookup`), o Elo e as odds do `loteca.json`.
 
 ### Problemas conhecidos nos dados da Caixa
 

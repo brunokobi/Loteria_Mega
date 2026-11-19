@@ -725,3 +725,48 @@ a.topbar-logo { text-decoration: none; }
   .metric-table th, .metric-table td, .metric-table tbody th { padding: 6px 5px; font-size: 12px; }
   .val-extra { padding: 18px 14px; }
 }
+
+/* ── Próximo sorteio e histórico de acertos ────────────────── */
+.next-draw {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px;
+  background: var(--gold-bg); border: 1px solid var(--gold-bdr); border-radius: var(--r);
+  padding: 14px 18px; margin-bottom: 20px;
+}
+.next-draw:empty { display: none; }
+.next-draw-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold); font-weight: 700; }
+.next-draw strong { font-size: 17px; }
+.next-draw-note { font-size: 12px; color: var(--sub); }
+.mini-balls { display: flex; flex-wrap: wrap; gap: 4px; }
+.mini-ball {
+  width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; background: var(--surf2); color: var(--text); border: 1px solid var(--border2);
+  font-family: 'JetBrains Mono', monospace;
+}
+.mini-ball.is-hit { background: var(--gold); color: #1a0e00; border-color: var(--gold); }
+.hist-table td, .hist-table tbody th { vertical-align: middle; text-align: left; }
+.hist-table small { color: var(--muted); font-weight: 500; }
+.hist-details { margin-top: 16px; }
+.hist-details summary { cursor: pointer; color: var(--sub); font-size: 14px; font-weight: 600; }
+.val-extra + .val-extra { margin-top: 16px; }
+.hist-table thead th, .hist-table thead th:first-child { text-align: left; }
+
+/* ── Loteca: concurso com os 14 jogos ──────────────────────── */
+.lt-tabs { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.lt-tabs:empty { display: none; }
+.lt-tab {
+  background: var(--surf); color: var(--sub); border: 1px solid var(--border2); border-radius: 999px;
+  padding: 8px 16px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.lt-tab small { font-weight: 500; margin-left: 4px; }
+.lt-tab[aria-selected="true"] { background: var(--gold); color: #1a0e00; border-color: var(--gold); }
+.lt-round { list-style: none; max-height: none; overflow: visible; }
+.lt-game-round { grid-template-columns: 32px minmax(0, 1fr) minmax(0, 1.1fr); }
+.lt-seq {
+  width: 28px; height: 28px; border-radius: 50%; background: var(--surf2); border: 1px solid var(--border2);
+  display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+}
+.lt-seq-inline { color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-right: 4px; }
+.lt-teams small { color: var(--muted); font-weight: 600; font-size: 11px; }
+.lt-round-note { list-style: none; margin-top: 6px; }
+@media (max-width: 760px) { .lt-game-round { grid-template-columns: 32px minmax(0, 1fr); } }

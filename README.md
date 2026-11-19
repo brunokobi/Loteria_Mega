@@ -43,6 +43,8 @@ O pipeline:
 │   ├── combinations.py             #   jogos ponderados e balanceados
 │   ├── strategies.py               #   estratégias vs. distribuição hipergeométrica
 │   ├── results.py                  #   monta o dicionário do results.json
+│   ├── history.py                  #   histórico de acertos das top 10 (retroativo e registro)
+│   ├── schedule.py                 #   data do próximo sorteio (Caixa ou calendário)
 │   └── update.py                   #   baixa concursos novos da API da Caixa
 ├── loteca/                         # Análise da Loteca (detalhes em docs/loteca.md)
 │   ├── update.py                   #   histórico de concursos pela API da Caixa
@@ -68,6 +70,7 @@ O pipeline:
 ├── requirements.txt                # Dependências de execução (versões fixas)
 ├── requirements-dev.txt            # + dependências de desenvolvimento
 ├── lottery-br-mega-sena.csv        # Dataset histórico da Mega-Sena
+├── mega_historico_retro.json       # Top 10 conferidas nos últimos 300 concursos
 ├── loteca.csv                      # Histórico da Loteca (1283 concursos, 17.952 jogos)
 ├── loteca_odds.csv                 # Odds históricas (football-data.co.uk, ~100 mil jogos)
 └── netlify.toml                    # Configuração de deploy
@@ -129,6 +132,21 @@ Resultado atual: o modelo tem AUC ≈ 0,50 e **log loss pior que os dois baselin
 
 ---
 
+## 🗓️ Histórico de acertos das previsões
+
+As top 10 combinações são conferidas com o resultado de duas formas:
+
+* **Teste retroativo** (`mega_historico_retro.json`): para cada um dos últimos 300 concursos, o modelo é treinado só com os sorteios anteriores (retreinado a cada 50) e gera as top 10 que o site teria mostrado na véspera. Comparação: 10 jogos aleatórios por concurso e a teoria. Resultado: **0,601 acerto por jogo no modelo, 0,610 no aleatório, 0,600 na teoria**; 33 concursos com terno ou melhor contra 30 no aleatório e 29,6 esperados.
+* **Registro daqui para frente** (`predicoes.json`): cada build guarda as top 10 do próximo concurso (a primeira previsão registrada vale) e confere as anteriores quando o resultado sai. Como o build do Netlify não guarda arquivos, cada build baixa o `predicoes.json` publicado no deploy anterior, acrescenta o que é novo e publica de novo.
+
+Para regenerar o teste retroativo (~2 minutos): `python -m megasena.history`.
+
+### Próximo sorteio
+
+O site sempre mostra o número e a data do próximo concurso. A data vem da API da Caixa: o navegador consulta direto (a API permite CORS) e o build grava o que conseguiu em `results.json`. Se a Caixa não responder, a data é estimada pelo calendário (terça, quinta e sábado) e aparece marcada como estimada. O build também grava em `meta.data_update` se conseguiu atualizar os sorteios, para diagnóstico.
+
+---
+
 ## 🎯 Estratégias vs. Teoria
 
 Nos últimos 500 sorteios, cada estratégia escolhe 6 números **antes** de cada sorteio:
@@ -159,7 +177,7 @@ Resultado no teste (642 concursos que o modelo nunca viu, aposta simples):
 | Sempre o mandante | 6,44 |
 | Chute aleatório | 4,67 |
 
-A página `loteca.html` mostra os jogos dos próximos dias com odds, permite adicionar jogos manualmente (probabilidade pelo Elo) e tem um **montador de aposta** que coloca os duplos e triplos onde há mais incerteza, com custo e chance de 14 e de 13 acertos.
+A página `loteca.html` mostra **só os 14 jogos dos concursos abertos**, tirados da programação oficial da Caixa (`loteca/programacao`), com data, prazo das apostas e prêmio estimado. Cada jogo usa as odds da Pinnacle quando já existem e o Elo nos demais. O **montador de aposta** coloca os duplos e triplos onde há mais incerteza, com custo e chance de 14 e de 13 acertos.
 
 ---
 
@@ -168,6 +186,7 @@ A página `loteca.html` mostra os jogos dos próximos dias com odds, permite adi
 **👉 [loteriabruno.netlify.app](https://loteriabruno.netlify.app)**
 
 A interface exibe:
+- Próximo sorteio (número e data) e histórico de acertos das top 10
 - Top 10 combinações geradas pelo modelo e 10 combinações balanceadas
 - Heatmap de frequência dos 60 números
 - Estatísticas descritivas (par/ímpar, décadas, soma)
@@ -177,7 +196,7 @@ A interface exibe:
 
 **Acessibilidade:** contraste de texto WCAG AA, landmarks e link para pular ao conteúdo, foco visível, heatmap navegável por teclado (setas) e por toque, textos alternativos para os jogos e gráficos, e respeito à preferência do sistema por menos movimento (sem animações nem física no hero). A auditoria com axe-core (regras WCAG 2 A/AA e boas práticas) não aponta violações.
 
-A página **Loteca** (`loteca.html`) tem os jogos da semana com odds, o jogo manual, o montador de aposta e o teste no histórico, com a mesma base de acessibilidade.
+A página **Loteca** (`loteca.html`) tem os 14 jogos de cada concurso aberto (em abas), o montador de aposta e o teste no histórico, com a mesma base de acessibilidade. Se o build não conseguir a programação na Caixa, o navegador busca direto e monta os jogos com o Elo e as odds publicados no build.
 
 O build roda `update_dataset.py`, `generate_results.py` e `generate_loteca.py`, e leva cerca de 2 a 3 minutos.
 
@@ -204,7 +223,8 @@ python update_dataset.py
 python mega3.py
 
 # Gerar dados para a interface web e servir localmente
-python generate_results.py
+python update_dataset.py           # grava também update_status.json (diagnóstico e próximo sorteio)
+python generate_results.py         # results.json + predicoes.json
 python generate_loteca.py          # com ODDSPAPI_KEY definida, inclui as odds da semana
 python -m http.server 8080
 

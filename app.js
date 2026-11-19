@@ -695,6 +695,125 @@ function triggerBuild() {
 
 document.getElementById('update-btn').addEventListener('click', triggerBuild);
 
+// ── Próximo sorteio ─────────────────────────────────────────────
+const WEEKDAY_FMT = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', timeZone: 'UTC' });
+const escHtml = s => String(s ?? '').replace(/[&<>"']/g,
+  c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function renderNextDraw(nd) {
+  const box = document.getElementById('next-draw');
+  if (!nd || !nd.date) { box.innerHTML = ''; return; }
+  const weekday = WEEKDAY_FMT.format(new Date(nd.date + 'T12:00:00Z'));
+  const estimated = nd.source === 'estimado';
+  box.innerHTML = `
+    <span class="next-draw-label">Próximo sorteio</span>
+    <strong>Concurso ${escHtml(nd.number)} · ${escHtml(weekday)}, ${escHtml(fmtDate(nd.date))}</strong>
+    ${estimated ? '<span class="next-draw-note">data estimada pelo calendário (ter/qui/sáb); confirme na Caixa</span>'
+                : '<span class="next-draw-note">data informada pela Caixa</span>'}`;
+  const pills = document.getElementById('meta-pills');
+  pills.querySelector('.pill-next')?.remove();
+  pills.insertAdjacentHTML('afterbegin',
+    `<div class="meta-pill pill-next">Próximo sorteio <strong>${escHtml(fmtDate(nd.date))}</strong>${estimated ? ' (estimado)' : ''}</div>`);
+}
+
+// O navegador consulta a Caixa direto (a API permite CORS): data sempre atual,
+// mesmo que o build não tenha conseguido acessar a Caixa.
+function refreshNextDrawFromCaixa(meta) {
+  fetch('https://servicebus2.caixa.gov.br/portaldeloterias/api/megasena/', { headers: { Accept: 'application/json' } })
+    .then(r => (r.ok ? r.json() : Promise.reject()))
+    .then(d => {
+      const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(d.dataProximoConcurso || '');
+      if (!m || !d.numeroConcursoProximo) return;
+      renderNextDraw({ number: d.numeroConcursoProximo, date: `${m[3]}-${m[2]}-${m[1]}`, source: 'caixa' });
+    })
+    .catch(() => { /* mantém a data do build */ });
+}
+
+// ── Histórico de acertos ────────────────────────────────────────
+const HIT_LABEL = { 3: 'terno', 4: 'quadra', 5: 'quina', 6: 'sena' };
+const ballsHtml = (nums, hitSet) => nums.map(n =>
+  `<span class="mini-ball${hitSet && hitSet.has(n) ? ' is-hit' : ''}">${n}</span>`).join('');
+
+function loadHistory() {
+  const getJson = url => fetch(url).then(r => (r.ok ? r.json() : null)).catch(() => null);
+  Promise.all([getJson('./predicoes.json'), getJson('./mega_historico_retro.json')])
+    .then(([log, retro]) => renderHistory(log, retro));
+}
+
+function renderHistory(log, retro) {
+  const box = document.getElementById('hist-content');
+  let html = '';
+
+  // Registro daqui para frente
+  const entries = log?.entries || [];
+  const checked = entries.filter(e => e.hits);
+  const pending = entries.find(e => !e.hits);
+  html += `<div class="val-extra"><h3>Registro das previsões</h3>`;
+  if (pending) {
+    html += `<p class="val-note">Previsão do concurso <strong>${escHtml(pending.concurso)}</strong> registrada em
+      ${escHtml(fmtDate(pending.registered_at))}; será conferida quando o resultado sair.</p>`;
+  }
+  if (checked.length) {
+    html += `
+      <table class="metric-table hist-table">
+        <caption class="sr-only">Previsões registradas e acertos</caption>
+        <thead><tr><th scope="col">Concurso</th><th scope="col">Sorteados</th><th scope="col">Melhor jogo</th><th scope="col">Jogos com 3+</th></tr></thead>
+        <tbody>${checked.slice(0, 30).map(e => {
+          const res = new Set(e.result);
+          const bestIdx = e.hits.indexOf(e.best);
+          const prize = e.hits.filter(h => h >= 3).length;
+          return `<tr>
+            <th scope="row">${escHtml(e.concurso)}<br><small>${escHtml(fmtDate(e.date))}</small></th>
+            <td><div class="mini-balls">${ballsHtml(e.result)}</div></td>
+            <td><div class="mini-balls">${ballsHtml(e.combinations[bestIdx], res)}</div><small>${e.best} acerto${e.best === 1 ? '' : 's'}${HIT_LABEL[e.best] ? ` · ${HIT_LABEL[e.best]}` : ''}</small></td>
+            <td>${prize}</td></tr>`;
+        }).join('')}</tbody>
+      </table>`;
+  } else if (!pending) {
+    html += `<p class="val-note">O registro começa no próximo build.</p>`;
+  }
+  html += `</div>`;
+
+  // Retroativo
+  if (retro) {
+    const m = retro.model, r = retro.random, ex = retro.expected;
+    const dist = (s, k) => (s.hits_distribution[String(k)] ?? 0).toLocaleString('pt-BR');
+    const exDist = k => Number(ex.hits_distribution[String(k)]).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+    html += `
+      <div class="val-extra">
+        <h3>Teste nos últimos ${retro.draws} concursos (${retro.first} a ${retro.last})</h3>
+        <table class="metric-table">
+          <caption class="sr-only">Distribuição de acertos das top 10 contra 10 jogos aleatórios e a teoria</caption>
+          <thead><tr><th scope="col">Acertos por jogo</th><th scope="col">Top 10 do modelo</th><th scope="col">10 jogos ao acaso</th><th scope="col">Esperado</th></tr></thead>
+          <tbody>
+            ${[0, 1, 2, 3, 4, 5, 6].map(k => `<tr><th scope="row">${k}${HIT_LABEL[k] ? ` (${HIT_LABEL[k]})` : ''}</th><td>${dist(m, k)}</td><td>${dist(r, k)}</td><td>${exDist(k)}</td></tr>`).join('')}
+            <tr class="model"><th scope="row">Média por jogo</th><td>${m.mean_hits.toFixed(3)}</td><td>${r.mean_hits.toFixed(3)}</td><td>${ex.mean_hits.toFixed(3)}</td></tr>
+            <tr><th scope="row">Concursos com terno ou melhor</th><td>${m.draws_with_terno_or_better}</td><td>${r.draws_with_terno_or_better}</td><td>${Number(ex.draws_with_terno_or_better).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</td></tr>
+          </tbody>
+        </table>
+        <div class="val-note">${m.games.toLocaleString('pt-BR')} jogos de cada lado. Para cada concurso, o modelo foi treinado só com
+          os sorteios anteriores (retreinado a cada ${retro.retrain_every} concursos) e gerou as mesmas top 10 que o site teria mostrado na véspera.</div>
+        <details class="hist-details">
+          <summary>Ver os últimos 20 concursos do teste</summary>
+          <table class="metric-table hist-table">
+            <caption class="sr-only">Últimos concursos do teste retroativo</caption>
+            <thead><tr><th scope="col">Concurso</th><th scope="col">Sorteados</th><th scope="col">Melhor das top 10</th><th scope="col">Melhor ao acaso</th></tr></thead>
+            <tbody>${retro.rows.slice(-20).reverse().map(row => `<tr>
+              <th scope="row">${row.concurso}<br><small>${escHtml(fmtDate(row.date))}</small></th>
+              <td><div class="mini-balls">${ballsHtml(row.result)}</div></td>
+              <td>${row.best}</td><td>${row.random_best}</td></tr>`).join('')}</tbody>
+          </table>
+        </details>
+      </div>
+      <div class="insight-box">
+        <strong>Conclusão:</strong> as top 10 acertam em média ${m.mean_hits.toFixed(2).replace('.', ',')} número por jogo, contra
+        ${r.mean_hits.toFixed(2).replace('.', ',')} dos jogos ao acaso e 0,60 da teoria. <strong>O modelo empata com o acaso</strong>,
+        como esperado num sorteio aleatório.
+      </div>`;
+  }
+  box.innerHTML = html;
+}
+
 // ── Fetch data ──────────────────────────────────────────────────
 fetch('./results.json')
   .then(r => {
@@ -704,6 +823,9 @@ fetch('./results.json')
   .then(data => {
     currentGeneratedAt = data.meta.generated_at;
     render(data);
+    renderNextDraw(data.meta.next_draw);
+    refreshNextDrawFromCaixa(data.meta);
+    loadHistory();
   })
   .catch(() => {
     document.getElementById('loading').innerHTML = `
