@@ -1,0 +1,21 @@
+name: Diagnostico Caixa
+
+on:
+  push:
+    branches: [diag/caixa]
+
+permissions:
+  contents: read
+
+jobs:
+  caixa:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mega-Sena (ultimo concurso)
+        run: curl -sS --fail -m 30 -A "Mozilla/5.0" -H "Accept: application/json" https://servicebus2.caixa.gov.br/portaldeloterias/api/megasena/ | head -c 200
+      - name: Loteca programacao
+        if: always()
+        run: curl -sS --fail -m 30 -A "Mozilla/5.0" -H "Accept: application/json" https://servicebus2.caixa.gov.br/portaldeloterias/api/loteca/programacao | head -c 200
+      - name: Loteca resultado
+        if: always()
+        run: curl -sS --fail -m 30 -A "Mozilla/5.0" -H "Accept: application/json" https://servicebus2.caixa.gov.br/portaldeloterias/api/loteca/ | head -c 200
