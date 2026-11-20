@@ -8,3 +8,5 @@ __pycache__/
 loteca.json
 predicoes.json
 update_status.json
+node_modules/
+dist/

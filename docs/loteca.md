@@ -17,7 +17,9 @@ Ordem das fontes para a programação:
 
 1. o build consulta a Caixa e casa cada jogo com o Elo e com as odds da semana;
 2. se a Caixa não responder no build, usa a programação publicada no deploy anterior (se as apostas ainda estiverem abertas);
-3. o navegador também consulta a Caixa (a API permite CORS) e, se o concurso for diferente do publicado, monta os jogos sozinho com as tabelas de times (`team_lookup`), o Elo e as odds do `loteca.json`.
+3. o navegador também consulta a Caixa (a API permite CORS) e, se o concurso for diferente do publicado, monta os jogos sozinho com as tabelas de times (`team_lookup`), o Elo e as odds do `loteca.json` (`LotecaModel.roundsFromCaixa` em `src/loteca/model.ts`).
+
+> A normalização de nomes de times existe em dois lugares: `loteca/live.py::normalize_name` (build) e `src/loteca/model.ts::normalizeName` (navegador). Se mudar uma, mude a outra, ou o navegador deixa de achar os times que o build acha.
 
 ### Bloqueio da Caixa fora do Brasil
 
@@ -46,7 +48,7 @@ Cada time começa com 1500 pontos. Jogo a jogo, em ordem cronológica:
 
 ### De Elo para probabilidade
 
-Uma regressão logística multinomial transforma o Elo em P(1), P(X), P(2), com três variáveis: diferença de Elo, indicador de "time novo" (menos de 10 jogos no histórico) e a interação entre as duas. O indicador faz o modelo confiar menos em times com pouco histórico. Os coeficientes vão no `loteca.json`, e o navegador recalcula a probabilidade dos jogos manuais com a mesma fórmula.
+Uma regressão logística multinomial transforma o Elo em P(1), P(X), P(2), com três variáveis: diferença de Elo, indicador de "time novo" (menos de 10 jogos no histórico) e a interação entre as duas. O indicador faz o modelo confiar menos em times com pouco histórico. Os coeficientes vão no `loteca.json`, e o navegador recalcula com a mesma fórmula a probabilidade dos jogos que ele monta a partir da Caixa (`LotecaModel.eloProbs` em `src/loteca/model.ts`).
 
 ### Odds
 
@@ -96,7 +98,7 @@ Os números acima são do teste rodado em novembro de 2026; a página mostra sem
 
 ## Montador de aposta
 
-Para cada jogo selecionado há três opções: simples (resultado mais provável), duplo (os dois mais prováveis) ou triplo. Dado o número de duplos e triplos escolhido, uma programação dinâmica distribui as marcações extras para **maximizar a probabilidade de acertar todos os jogos** (produto das probabilidades cobertas). A chance de 13 ou mais acertos vem da distribuição de Poisson-binomial das coberturas.
+Para cada um dos 14 jogos há três opções: simples (resultado mais provável), duplo (os dois mais prováveis) ou triplo. Dado o número de duplos e triplos escolhido, uma programação dinâmica distribui as marcações extras para **maximizar a probabilidade de acertar todos os jogos** (produto das probabilidades cobertas). A chance de 13 ou mais acertos vem da distribuição de Poisson-binomial das coberturas. O cálculo roda no navegador (`optimize` e `hitDistribution` em `src/loteca/builder.ts`).
 
 Preço usado: **R$ 2,00 por combinação** (aposta mínima de R$ 4,00 com 1 duplo; máximo de 5 duplos e 3 triplos). Os valores vêm de notícias de 2026 e podem mudar: estão em `loteca/results.py::PRICING` e a página pede para conferir na Caixa.
 
@@ -152,4 +154,8 @@ python -m loteca.update          # concursos novos da Loteca
 python -m loteca.odds_history    # odds históricas (~5 min, ~280 arquivos)
 python -m loteca.backtest        # teste do Elo (JSON)
 ODDSPAPI_KEY=... python generate_loteca.py   # loteca.json completo
+
+# ver a página localmente
+npm install && npm run build     # compila o TypeScript para dist/
+python -m http.server 8080       # http://localhost:8080/loteca.html
 ```

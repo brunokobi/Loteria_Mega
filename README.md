@@ -1,6 +1,7 @@
 # 🎰 Loterias IA – Dá para prever a loteria com Machine Learning?
 
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
+![TypeScript](https://img.shields.io/badge/Front--end-TypeScript-3178C6?logo=typescript&logoColor=white)
 ![Machine Learning](https://img.shields.io/badge/Machine%20Learning-Gradient%20Boosting-green)
 ![Status](https://img.shields.io/badge/Status-Ativo-orange)
 ![License](https://img.shields.io/badge/License-Educational-lightgrey)
@@ -9,7 +10,7 @@
 
 🌐 **[loteriabruno.netlify.app](https://loteriabruno.netlify.app)**
 
-Este repositório é um **experimento educacional de Machine Learning** com duas loterias da Caixa, sempre **avaliado com rigor** contra baselines simples:
+**Loterias IA** é um **experimento educacional de Machine Learning** com duas loterias da Caixa, sempre **avaliado com rigor** contra baselines simples. A análise roda em Python no build e o site, com uma página para cada loteria, é escrito em TypeScript:
 
 * **Mega-Sena** (`index.html`): um modelo treinado com o histórico de sorteios. O resultado esperado, e confirmado pelos números, é que **nenhum modelo consegue prever os sorteios**.
 * **Loteca** (`loteca.html`): probabilidades dos jogos de futebol pelas **odds da Pinnacle** e por um **rating Elo** treinado com 1283 concursos, mais um montador de duplos e triplos. Aqui, ao contrário da Mega-Sena, **dá para acertar mais que o acaso** (≈7,0 acertos por concurso contra 4,7 no chute), mas o retorno esperado da aposta continua negativo.
@@ -64,11 +65,17 @@ O pipeline:
 ├── mega3.py                        # CLI — análise completa da Mega-Sena no terminal
 ├── generate_results.py             # Gera results.json (Mega-Sena)
 ├── generate_loteca.py              # Gera loteca.json (Loteca)
-├── index.html / app.js             # Página da Mega-Sena
-├── loteca.html / loteca.js         # Página da Loteca
+├── src/                            # Front-end em TypeScript (compilado para dist/)
+│   ├── shared/                     #   utilitários e cliente da API da Caixa
+│   ├── mega/                       #   página da Mega-Sena (types.ts = formato do results.json)
+│   └── loteca/                     #   página da Loteca (types.ts = formato do loteca.json)
+├── index.html                      # Página da Mega-Sena (carrega dist/app.js)
+├── loteca.html                     # Página da Loteca (carrega dist/loteca.js)
 ├── styles.css                      # Estilos compartilhados
-├── netlify/functions/              # Função que dispara novo build no Netlify
-├── .github/workflows/ci.yml        # CI: ruff + pytest
+├── netlify/functions/              # Função (TypeScript) que dispara novo build no Netlify
+├── scripts/build.mjs               # Build do front com esbuild
+├── package.json / tsconfig.json    # Dependências e configuração do TypeScript
+├── .github/workflows/ci.yml        # CI: ruff + pytest e typecheck + build do front
 ├── pyproject.toml                  # Configuração do ruff e do pytest
 ├── requirements.txt                # Dependências de execução (versões fixas)
 ├── requirements-dev.txt            # + dependências de desenvolvimento
@@ -192,7 +199,9 @@ A página `loteca.html` mostra **só os 14 jogos dos concursos abertos**, tirado
 
 **👉 [loteriabruno.netlify.app](https://loteriabruno.netlify.app)**
 
-A interface exibe:
+O site **Loterias IA** tem duas páginas: Mega-Sena (`index.html`) e Loteca (`loteca.html`). O front-end é escrito em **TypeScript** (`src/`) e compilado com esbuild para `dist/`, que não vai para o repositório: o build do Netlify gera. Os tipos em `src/mega/types.ts` e `src/loteca/types.ts` descrevem os JSON gerados pelo Python; se um campo mudar no Python, ajuste o tipo e o `npm run typecheck` aponta o que quebra nas páginas.
+
+A página da Mega-Sena exibe:
 - Próximo sorteio (número e data) e histórico de acertos das top 10
 - Top 10 combinações geradas pelo modelo e 10 combinações balanceadas
 - Heatmap de frequência dos 60 números
@@ -213,7 +222,7 @@ Como a Caixa bloqueia servidores fora do Brasil, o registro roda numa máquina n
 
 > **Limitação da Loteca:** o espelho comunitário não tem a Loteca, então o build não consegue baixar concursos novos para o histórico (`loteca.csv`) e o Elo só avança quando alguém roda a atualização numa máquina no Brasil: `python -m loteca.update` e push. A página continua funcionando com os jogos e as odds da semana.
 
-O build roda `update_dataset.py`, `generate_results.py` e `generate_loteca.py`, e leva cerca de 2 a 3 minutos.
+O build compila o TypeScript (`npm run build`) e roda `update_dataset.py`, `generate_results.py` e `generate_loteca.py`; leva cerca de 2 a 3 minutos.
 
 ### Variáveis de ambiente (Netlify)
 
@@ -241,6 +250,7 @@ python mega3.py
 python update_dataset.py           # grava também update_status.json (diagnóstico e próximo sorteio)
 python generate_results.py         # results.json + predicoes.json
 python generate_loteca.py          # com ODDSPAPI_KEY definida, inclui as odds da semana
+npm install && npm run build       # compila o TypeScript para dist/ (Node 22)
 python -m http.server 8080
 
 # Loteca: teste no passado e odds históricas
@@ -255,9 +265,13 @@ python -m loteca.backtest          # imprime o teste do Elo em JSON
 pip install -r requirements-dev.txt
 ruff check .
 pytest
+
+npm install
+npm run dev          # recompila o front a cada alteração em src/
+npm run typecheck    # checagem de tipos (tsc --noEmit)
 ```
 
-Os testes cobrem a ausência de data leakage nas features, a equivalência da versão vetorizada com a implementação original, as regras dos jogos balanceados, a distribuição hipergeométrica, a atualização do dataset (com a API simulada) e o formato do `results.json`. Na Loteca: Elo sem olhar o futuro, casamento de jogos exigindo o mesmo placar, remoção da margem das odds, unificação de nomes de times e falhas das APIs. O CI (GitHub Actions, Python 3.11) roda ruff e pytest a cada push e PR.
+Os testes cobrem a ausência de data leakage nas features, a equivalência da versão vetorizada com a implementação original, as regras dos jogos balanceados, a distribuição hipergeométrica, a atualização do dataset (com a API simulada) e o formato do `results.json`. Na Loteca: Elo sem olhar o futuro, casamento de jogos exigindo o mesmo placar, remoção da margem das odds, unificação de nomes de times e falhas das APIs. O CI (GitHub Actions) roda ruff e pytest (Python 3.11) e o typecheck e o build do front (Node 22) a cada push e PR.
 
 ---
 
