@@ -194,6 +194,18 @@ def test_split_name_and_match_team():
     assert live.match_team('Chelsea FC', 'ING', index) is None
 
 
+def test_match_team_international_tournament():
+    # Libertadores / Sul-Americana (country None): brasileiro vem com a UF no nome
+    ratings = {'ATLETICO/MG': 1620, 'ATLETICO': 1500, 'PALMEIRAS/SP': 1650,
+               'BOCA JUNIORS/ARG': 1600, 'ESTUDIANTES/ARG': 1550}
+    index = live.build_team_index(ratings)
+    assert live.split_name('Atletico Mineiro MG', None) == ('ATLETICO MINEIRO', 'MG')
+    assert live.match_team('Atletico Mineiro MG', None, index) == 'ATLETICO/MG'
+    assert live.match_team('SE Palmeiras SP', None, index) == 'PALMEIRAS/SP'
+    assert live.match_team('Boca Juniors', None, index) == 'BOCA JUNIORS/ARG'
+    assert live.match_team('Estudiantes de La Plata', None, index) == 'ESTUDIANTES/ARG'
+
+
 def test_probs_from_market():
     def out(price):
         return {'players': {'0': {'price': price}}}

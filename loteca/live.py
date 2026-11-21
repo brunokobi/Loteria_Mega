@@ -58,10 +58,15 @@ def _probs_from_market(market):
 
 
 def split_name(name, country):
-    """'CR Flamengo RJ' -> ('CR FLAMENGO', 'RJ') para times brasileiros."""
+    """
+    'CR Flamengo RJ' -> ('CR FLAMENGO', 'RJ') para times brasileiros.
+    Em torneios internacionais (country None: Libertadores, Sul-Americana) a OddsPapi
+    tambem poe a UF no fim do nome dos brasileiros ('Atletico Mineiro MG'): a UF
+    identifica o time como brasileiro, senao ele seria buscado so entre os estrangeiros.
+    """
     n = normalize_name(name)
     parts = n.split()
-    if country == 'BRA' and len(parts) > 1 and parts[-1] in BR_STATES:
+    if country in ('BRA', None) and len(parts) > 1 and parts[-1] in BR_STATES:
         return ' '.join(parts[:-1]), parts[-1]
     return n, country
 
