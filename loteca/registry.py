@@ -11,6 +11,7 @@ O arquivo loteca_registro.json e versionado. Ele precisa ser atualizado numa maq
 acesse a API da Caixa (no Brasil): python -m loteca.registry
 """
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -145,9 +146,12 @@ def main():
 
     warnings.filterwarnings('ignore')
     update_csv()
-    data = build_loteca()
     registry = load_registry()
-    record_rounds(registry, data['rounds'])
+    if os.environ.get('ODDSPAPI_KEY'):
+        record_rounds(registry, build_loteca()['rounds'])
+    else:
+        # sem a chave, as previsoes sairiam so com Elo e sobrescreveriam as que tem odds
+        print("ODDSPAPI_KEY nao definida: so atualizo e confiro, sem registrar previsoes.")
     score_rounds(registry, load_games())
     save_registry(registry)
     s = registry['summary']

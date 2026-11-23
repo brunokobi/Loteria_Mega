@@ -127,6 +127,8 @@ chmod 600 ~/.config/loteca/env
 ./scripts/registrar_loteca.sh
 ```
 
+Sem `ODDSPAPI_KEY`, o script **só atualiza o histórico e confere**: não registra previsões, para não sobrescrever as que têm odds por versões só com Elo. Como o "último concurso" da API demora a mudar depois da apuração, a atualização também tenta os 2 números seguintes, e só aceita concursos com data de apuração.
+
 **Agendamento sugerido** (sexta à noite e sábado de manhã para registrar com as odds mais recentes; terça para conferir): 3 execuções por semana. Cada execução que publica algo gasta ~6 requisições da OddsPapi no script e ~6 no build do Netlify, ~150 por mês, dentro das 250 do plano grátis.
 
 * **Linux/WSL (cron):** `crontab -e` e

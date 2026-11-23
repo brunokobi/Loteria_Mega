@@ -210,7 +210,9 @@
       0.4798
      ],
      "source": "odds",
-     "pick": "2"
+     "pick": "2",
+     "outcome": "X",
+     "hit": false
     },
     {
      "seq": 2,
@@ -223,7 +225,9 @@
       0.1466
      ],
      "source": "odds",
-     "pick": "1"
+     "pick": "1",
+     "outcome": "1",
+     "hit": true
     },
     {
      "seq": 3,
@@ -236,7 +240,9 @@
       0.161
      ],
      "source": "odds",
-     "pick": "1"
+     "pick": "1",
+     "outcome": "2",
+     "hit": false
     },
     {
      "seq": 4,
@@ -249,7 +255,9 @@
       0.4201
      ],
      "source": "odds",
-     "pick": "2"
+     "pick": "2",
+     "outcome": "2",
+     "hit": true
     },
     {
      "seq": 5,
@@ -262,7 +270,9 @@
       0.6575
      ],
      "source": "odds",
-     "pick": "2"
+     "pick": "2",
+     "outcome": "2",
+     "hit": true
     },
     {
      "seq": 6,
@@ -275,7 +285,9 @@
       0.0526
      ],
      "source": "odds",
-     "pick": "1"
+     "pick": "1",
+     "outcome": "1",
+     "hit": true
     },
     {
      "seq": 7,
@@ -288,7 +300,9 @@
       0.1147
      ],
      "source": "odds",
-     "pick": "1"
+     "pick": "1",
+     "outcome": "1",
+     "hit": true
     },
     {
      "seq": 8,
@@ -301,7 +315,9 @@
       0.0716
      ],
      "source": "odds",
-     "pick": "1"
+     "pick": "1",
+     "outcome": "1",
+     "hit": true
     },
     {
      "seq": 9,
@@ -314,7 +330,9 @@
       0.23
      ],
      "source": "odds",
-     "pick": "1"
+     "pick": "1",
+     "outcome": "1",
+     "hit": true
     },
     {
      "seq": 10,
@@ -327,7 +345,9 @@
       0.2064
      ],
      "source": "elo",
-     "pick": "1"
+     "pick": "1",
+     "outcome": "1",
+     "hit": true
     },
     {
      "seq": 11,
@@ -340,7 +360,9 @@
       0.2308
      ],
      "source": "elo",
-     "pick": "1"
+     "pick": "1",
+     "outcome": "1",
+     "hit": true
     },
     {
      "seq": 12,
@@ -353,7 +375,9 @@
       0.2133
      ],
      "source": "odds",
-     "pick": "1"
+     "pick": "1",
+     "outcome": "1",
+     "hit": true
     },
     {
      "seq": 13,
@@ -366,7 +390,9 @@
       0.595
      ],
      "source": "odds",
-     "pick": "2"
+     "pick": "2",
+     "outcome": "X",
+     "hit": false
     },
     {
      "seq": 14,
@@ -379,12 +405,29 @@
       0.6113
      ],
      "source": "odds",
-     "pick": "2"
+     "pick": "2",
+     "outcome": "2",
+     "hit": true
     }
    ],
-   "result": null
+   "result": {
+    "games": 14,
+    "hits": 11,
+    "pct": 0.7857,
+    "log_loss": 0.735,
+    "brier": 0.4081,
+    "hits_odds": 9,
+    "games_odds": 12
+   }
   }
  ],
- "summary": null,
- "updated_at": "2026-11-19 15:32"
+ "summary": {
+  "rounds": 1,
+  "games": 14,
+  "hits": 11,
+  "pct": 0.7857,
+  "mean_hits_per_round": 11.0,
+  "best_round": 11
+ },
+ "updated_at": "2026-11-23 14:25"
 }

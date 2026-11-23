@@ -52,8 +52,13 @@ def test_update_csv_resumes(tmp_path):
     def fetch(number=None, bad=None):
         return api_round(3 if number is None else number)
 
-    assert update_csv(path, fetch=fetch, delay=0, log=lambda *_: None) == 3
-    assert update_csv(path, fetch=fetch, delay=0, log=lambda *_: None) == 0
+    def fetch3(number=None):
+        if number is not None and number > 3:
+            raise OSError('404')
+        return api_round(3 if number is None else number)
+
+    assert update_csv(path, fetch=fetch3, delay=0, log=lambda *_: None) == 3
+    assert update_csv(path, fetch=fetch3, delay=0, log=lambda *_: None) == 0
     df = pd.read_csv(path)
     assert len(df) == 42 and df['concurso'].tolist()[-1] == 3
 
@@ -278,3 +283,25 @@ def test_match_fixture_by_keys_and_names():
     assert live.match_fixture(no_keys, fixtures)['odds'] == [0.3, 0.3, 0.4]  # pelos nomes
     far = dict(game, date='2026-11-25')
     assert live.match_fixture(far, fixtures) is None  # data distante
+
+
+def test_update_csv_probes_beyond_stale_latest(tmp_path):
+    """O 'ultimo' da Caixa ainda diz 3, mas o 4 ja foi apurado e responde pelo numero."""
+    path = tmp_path / 'loteca.csv'
+
+    def fetch(number=None):
+        if number is None:
+            return api_round(3)
+        if number > 4:
+            raise OSError('404')
+        return api_round(number)
+
+    assert update_csv(path, fetch=fetch, delay=0, log=lambda *_: None) == 4
+    assert pd.read_csv(path)['concurso'].max() == 4
+
+
+def test_parse_round_rejects_unapurado():
+    data = api_round(5)
+    data['dataApuracao'] = None
+    with pytest.raises(RoundDataError):
+        parse_round(data)

@@ -8,6 +8,7 @@ from pathlib import Path
 API_URL = 'https://servicebus2.caixa.gov.br/portaldeloterias/api/loteca/'
 HEADERS = {'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json'}
 DEFAULT_CSV = Path(__file__).resolve().parent.parent / 'loteca.csv'
+PROBE_AHEAD = 2  # concursos alem do 'ultimo' informado pela Caixa
 COLUMNS = ['concurso', 'jogo', 'data', 'campeonato', 'mandante', 'uf_mandante',
            'visitante', 'uf_visitante', 'gols_mandante', 'gols_visitante', 'sorteado']
 
@@ -35,6 +36,8 @@ def parse_round(data, expected_number=None):
     number = int(data['numero'])
     if expected_number is not None and number != expected_number:
         raise RoundDataError(f"concurso {number} recebido, esperado {expected_number}")
+    if not data.get('dataApuracao'):  # concurso ainda nao apurado
+        raise RoundDataError(f"concurso {number} sem data de apuracao")
     games = sorted(data.get('listaResultadoEquipeEsportiva') or [], key=lambda g: g['nuSequencial'])
     seqs = [int(g['nuSequencial']) for g in games]
     # a API da Caixa tem concursos antigos com jogos faltando (ex.: 244 sem o jogo 11):
@@ -81,23 +84,23 @@ def update_csv(path=DEFAULT_CSV, fetch=fetch_round, delay=0.2, log=print):
     except Exception as exc:
         log(f"Aviso: nao foi possivel consultar o ultimo concurso da Loteca ({exc}). CSV mantido.")
         return 0
-    if latest <= last:
-        log(f"Loteca ja atualizada (concurso {last}).")
-        return 0
-
-    log(f"Loteca: buscando concursos {last + 1} a {latest}...")
+    # o "ultimo concurso" da Caixa demora a mudar depois da apuracao, mas o concurso novo
+    # ja responde pelo numero: tenta tambem os PROBE_AHEAD seguintes
+    target = max(latest, last) + PROBE_AHEAD
+    log(f"Loteca: buscando concursos {last + 1} a {max(latest, last + 1)}...")
     new_file = not Path(path).exists()
     added = 0
     with open(path, 'a', encoding='utf-8', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=COLUMNS)
         if new_file:
             writer.writeheader()
-        for number in range(last + 1, latest + 1):
+        for number in range(last + 1, target + 1):
             try:
                 rows = parse_round(fetch(number), expected_number=number)
             except Exception as exc:
-                log(f"Aviso: falha no concurso {number} da Loteca ({exc}). Parando aqui.")
-                break
+                if number <= latest:
+                    log(f"Aviso: falha no concurso {number} da Loteca ({exc}). Parando aqui.")
+                break  # alem do ultimo anunciado: ainda nao apurado
             writer.writerows(rows)
             f.flush()
             added += 1
