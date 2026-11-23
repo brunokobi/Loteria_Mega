@@ -108,7 +108,7 @@ Preço usado: **R$ 2,00 por combinação** (aposta mínima de R$ 4,00 com 1 dupl
 
 1. **Registro:** para cada concurso aberto da programação, grava os 14 jogos com as probabilidades (odds quando o jogo tem, senão Elo), a fonte e o palpite (resultado mais provável). Só registra se todos os jogos tiverem previsão.
 2. **Atualização até o prazo:** enquanto as apostas estão abertas, a previsão é atualizada a cada execução (as odds mudam durante a semana); `first_registered_at` guarda o primeiro registro e `registered_at` a última atualização. **Depois do prazo, a previsão fica congelada.**
-3. **Conferência:** quando o concurso entra no `loteca.csv`, calcula acertos, % de acerto, log loss e Brier, e quantos acertos vieram de jogos com odds.
+3. **Conferência:** quando o concurso entra no `loteca.csv`, calcula acertos, % de acerto, log loss e Brier, e quantos acertos vieram de jogos com odds, e grava o placar de cada jogo. Na página, clicar num concurso do histórico abre os 14 jogos com placar, probabilidades registradas, palpite e resultado.
 
 ### Como rodar
 

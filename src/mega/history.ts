@@ -37,13 +37,54 @@ const ballsHtml = (nums: number[], hitSet?: Set<number>) => nums.map(n =>
 const isChecked = (e: PredictionEntry): e is CheckedEntry =>
   e.hits != null && e.result != null && e.best != null;
 
+const openDraws = new Set<number>();   // concursos com os detalhes abertos
+let current: { log: PredictionLog | null; retro: RetroHistory | null } = { log: null, retro: null };
+
 export async function loadHistory(): Promise<void> {
   const [log, retro] = await Promise.all([
     getJson<PredictionLog>('./predicoes.json'),
     getJson<RetroHistory>('./mega_historico_retro.json'),
   ]);
+  byId('hist-content').addEventListener('click', e => {
+    const row = (e.target as Element).closest<HTMLElement>('tr.reg-row');
+    if (!row) return;
+    const n = Number(row.dataset.n);
+    if (openDraws.has(n)) openDraws.delete(n); else openDraws.add(n);
+    renderHistory(current.log, current.retro);
+    document.querySelector<HTMLElement>(`#hist-content tr.reg-row[data-n="${n}"] .reg-toggle`)?.focus();
+  });
   renderHistory(log, retro);
   void checkPendingInBrowser(log, retro);
+}
+
+/** As 10 combinações registradas para um concurso, com os números sorteados destacados. */
+function drawDetail(e: PredictionEntry): string {
+  const res = isChecked(e) ? new Set(e.result) : undefined;
+  const stamp = (s: string | null | undefined) => (s ? esc(fmtDate(s)) : '—');  // fmtDate já inclui a hora
+  const facts = [
+    `<div><span>Concurso</span><strong>${esc(e.concurso)}</strong></div>`,
+    `<div><span>Previsão registrada</span><strong>${stamp(e.registered_at)}</strong></div>`,
+    isChecked(e) ? `<div><span>Sorteio</span><strong>${esc(weekdayOf(e.date))}, ${esc(fmtDate(e.date))}</strong></div>` : '<div><span>Situação</span><strong>aguardando o sorteio</strong></div>',
+    isChecked(e) ? `<div><span>Números sorteados</span><div class="mini-balls">${ballsHtml(e.result)}</div></div>` : '',
+    isChecked(e) ? `<div><span>Acertos (10 jogos)</span><strong>${e.hits.reduce((a, h) => a + h, 0)} números · melhor jogo ${e.best}</strong></div>` : '',
+  ].join('');
+  const rows = e.combinations.map((c, i) => {
+    const h = isChecked(e) ? e.hits[i]! : null;
+    const label = h != null && HIT_LABEL[h] ? ` · ${HIT_LABEL[h]}` : '';
+    return `<tr><td class="reg-seq">${i + 1}</td>
+      <td><div class="mini-balls">${ballsHtml(c, res)}</div></td>
+      <td>${h == null ? '<small>aguardando</small>' : `<strong>${h}</strong> acerto${h === 1 ? '' : 's'}${label}`}</td></tr>`;
+  }).join('');
+  return `
+    <div class="reg-detail-box">
+      <div class="reg-facts">${facts}</div>
+      <table class="metric-table reg-games">
+        <caption class="sr-only">As 10 combinações registradas para o concurso ${esc(e.concurso)} e os acertos</caption>
+        <thead><tr><th scope="col">#</th><th scope="col">Combinação</th><th scope="col">Acertos</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      ${res ? '<p class="val-note">Em dourado, os números que saíram no sorteio.</p>' : ''}
+    </div>`;
 }
 
 /** Confere a previsão pendente assim que a Caixa publica o resultado (o build pode demorar a ver). */
@@ -64,33 +105,40 @@ async function checkPendingInBrowser(log: PredictionLog | null, retro: RetroHist
 }
 
 function renderHistory(log: PredictionLog | null, retro: RetroHistory | null): void {
-  const entries = log?.entries ?? [];
-  const checked = entries.filter(isChecked);
-  const pending = entries.find(e => !isChecked(e));
+  current = { log, retro };
+  const entries = (log?.entries ?? []).slice(0, 30);
   let html = '<div class="val-extra"><h3>Registro das previsões</h3>';
 
-  if (pending) {
-    html += `<p class="val-note">Previsão do concurso <strong>${esc(pending.concurso)}</strong> registrada em
-      ${esc(fmtDate(pending.registered_at))}; será conferida quando o resultado sair.</p>`;
-  }
-  if (checked.length) {
+  if (entries.length) {
     html += `
-      <table class="metric-table hist-table">
-        <caption class="sr-only">Previsões registradas e acertos</caption>
+      <table class="metric-table hist-table reg-table">
+        <caption class="sr-only">Previsões registradas e acertos. Abra um concurso para ver as 10 combinações.</caption>
         <thead><tr><th scope="col">Concurso</th><th scope="col">Sorteados</th><th scope="col">Melhor jogo</th><th scope="col">Jogos com 3+</th></tr></thead>
-        <tbody>${checked.slice(0, 30).map(e => {
-          const res = new Set(e.result);
-          const bestGame = e.combinations[e.hits.indexOf(e.best)] ?? [];
-          const prize = e.hits.filter(h => h >= 3).length;
-          const label = HIT_LABEL[e.best];
-          return `<tr>
-            <th scope="row">${esc(e.concurso)}<br><small>${esc(fmtDate(e.date))}${e.checked_in_browser ? ' · conferido agora' : ''}</small></th>
+        <tbody>${entries.map(e => {
+          const open = openDraws.has(e.concurso);
+          const toggle = `<button type="button" class="reg-toggle" aria-expanded="${open}" aria-controls="draw-det-${e.concurso}">
+                <span class="reg-caret" aria-hidden="true">▸</span> ${esc(e.concurso)}<span class="sr-only">: ver as 10 combinações</span></button>`;
+          let cells: string;
+          if (isChecked(e)) {
+            const res = new Set(e.result);
+            const bestGame = e.combinations[e.hits.indexOf(e.best)] ?? [];
+            const label = HIT_LABEL[e.best];
+            cells = `
+            <th scope="row">${toggle}<br><small>${esc(fmtDate(e.date))}${e.checked_in_browser ? ' · conferido agora' : ''}</small></th>
             <td><div class="mini-balls">${ballsHtml(e.result)}</div></td>
             <td><div class="mini-balls">${ballsHtml(bestGame, res)}</div><small>${e.best} acerto${e.best === 1 ? '' : 's'}${label ? ` · ${label}` : ''}</small></td>
-            <td>${prize}</td></tr>`;
+            <td>${e.hits.filter(h => h >= 3).length}</td>`;
+          } else {
+            cells = `
+            <th scope="row">${toggle}<br><small>registrada em ${esc(fmtDate(e.registered_at))}</small></th>
+            <td colspan="3"><small>aguardando o sorteio; será conferida quando o resultado sair</small></td>`;
+          }
+          return `<tr class="reg-row${open ? ' is-open' : ''}" data-n="${e.concurso}">${cells}</tr>
+          <tr class="reg-detail" id="draw-det-${e.concurso}"${open ? '' : ' hidden'}><td colspan="4">${open ? drawDetail(e) : ''}</td></tr>`;
         }).join('')}</tbody>
-      </table>`;
-  } else if (!pending) {
+      </table>
+      <p class="val-note">Clique num concurso para ver as 10 combinações registradas e os acertos de cada uma.</p>`;
+  } else {
     html += '<p class="val-note">O registro começa no próximo build.</p>';
   }
   html += '</div>';

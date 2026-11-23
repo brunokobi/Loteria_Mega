@@ -90,11 +90,21 @@ def record_rounds(registry, open_rounds, now=None):
 
 def score_rounds(registry, games_df):
     """Confere os concursos registrados que ja tem resultado no historico (loteca.csv)."""
-    results = {}
+    results, goals = {}, {}
+    has_goals = {'gols_mandante', 'gols_visitante'} <= set(games_df.columns)
     for rnd, grp in games_df.groupby('concurso'):
         results[int(rnd)] = {int(j): o for j, o in zip(grp['jogo'], grp['result'])}
+        if has_goals:
+            goals[int(rnd)] = {int(j): [int(h), int(a)] for j, h, a in
+                               zip(grp['jogo'], grp['gols_mandante'], grp['gols_visitante'])}
     for entry in registry['rounds']:
-        if entry.get('result') or entry['number'] not in results:
+        if entry['number'] not in results:
+            continue
+        # placar de cada jogo (tambem completa concursos conferidos antes de existir o campo)
+        for g in entry['games']:
+            if 'goals' not in g and g['seq'] in goals.get(entry['number'], {}):
+                g['goals'] = goals[entry['number']][g['seq']]
+        if entry.get('result'):
             continue
         actual = results[entry['number']]
         scored = [g for g in entry['games'] if g['seq'] in actual]

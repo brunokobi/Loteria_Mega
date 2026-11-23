@@ -66,3 +66,14 @@ def test_unscored_round_stays_pending():
     reg = record_rounds({'rounds': []}, [make_round()], now=at(19, 10))
     score_rounds(reg, pd.DataFrame({'concurso': [9], 'jogo': [1], 'result': ['1']}))
     assert reg['rounds'][0]['result'] is None and summarize(reg) is None
+
+
+def test_score_records_goals_and_backfills():
+    reg = record_rounds({'rounds': []}, [make_round()], now=at(19, 10))
+    score_rounds(reg, pd.DataFrame({'concurso': [10, 10], 'jogo': [1, 2], 'result': ['1', 'X']}))
+    assert 'goals' not in reg['rounds'][0]['games'][0]  # sem colunas de gols: sem placar
+    df = pd.DataFrame({'concurso': [10, 10], 'jogo': [1, 2], 'result': ['1', 'X'],
+                       'gols_mandante': [2, 1], 'gols_visitante': [0, 1]})
+    score_rounds(reg, df)  # ja conferido: so completa o placar
+    assert reg['rounds'][0]['games'][0]['goals'] == [2, 0]
+    assert reg['rounds'][0]['result']['hits'] == 1

@@ -771,3 +771,34 @@ a.topbar-logo { text-decoration: none; }
 .lt-round-note { list-style: none; margin-top: 6px; }
 @media (max-width: 760px) { .lt-game-round { grid-template-columns: 32px minmax(0, 1fr); } }
 .lt-reg-summary { margin-bottom: 16px; }
+
+/* ── Detalhes do histórico de previsões ────────────────────── */
+.reg-row { cursor: pointer; }
+.reg-row:hover th, .reg-row:hover td { background: var(--surf2); }
+.reg-toggle {
+  background: none; border: 0; color: var(--text); font: inherit; font-weight: 700; font-size: 14px;
+  cursor: pointer; padding: 2px 0; display: inline-flex; align-items: center; gap: 6px;
+}
+.reg-caret { display: inline-block; transition: transform .15s; color: var(--gold); }
+.reg-row.is-open .reg-caret { transform: rotate(90deg); }
+.reg-detail > td { padding: 0 0 16px !important; background: var(--surf2); }
+.reg-detail-box { padding: 16px; }
+.reg-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.reg-facts div { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.reg-facts span { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+.reg-games td, .reg-games tbody th { text-align: left; vertical-align: middle; }
+.reg-games thead th { text-align: left; }
+.reg-seq { color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+.reg-score { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--text); white-space: nowrap; }
+.reg-games .lt-pick { width: 46px; }
+.lt-pick.is-real { box-shadow: 0 0 0 2px var(--green); }
+.reg-hit { color: var(--green); font-weight: 700; white-space: nowrap; }
+.reg-miss { color: var(--red); font-weight: 700; white-space: nowrap; }
+@media (max-width: 760px) {
+  .reg-games thead { display: none; }
+  .reg-games tr { display: grid; grid-template-columns: 28px 1fr auto; gap: 4px 8px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .reg-games td, .reg-games tbody th { border: 0 !important; padding: 0 !important; }
+  .reg-games td:nth-child(4) { grid-column: 2 / 4; }
+  .reg-games td:nth-child(5) { grid-column: 2; }
+}
+.lt-pick.is-on small, .hist-table .lt-pick.is-on small { color: inherit; }

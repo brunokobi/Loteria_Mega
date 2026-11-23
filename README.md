@@ -157,7 +157,7 @@ Para regenerar o teste retroativo (~2 minutos): `python -m megasena.history`.
 
 O site sempre mostra o número e a data do próximo concurso. O **navegador de quem visita consulta a Caixa direto** (a API permite CORS e o visitante está no Brasil), então a data fica certa mesmo com o build bloqueado. O build grava a data que conseguiu (Caixa ou espelho) em `results.json`; se nenhuma fonte responder, a data é estimada pelo calendário (terça, quinta e sábado) e aparece marcada como estimada.
 
-O navegador também **confere a previsão pendente** assim que a Caixa publica o resultado, sem esperar o próximo build (aparece como "conferido agora").
+O navegador também **confere a previsão pendente** assim que a Caixa publica o resultado, sem esperar o próximo build (aparece como "conferido agora"). No histórico, clicar num concurso mostra as 10 combinações registradas com os números sorteados destacados.
 
 ---
 
@@ -216,7 +216,7 @@ A página **Loteca** (`loteca.html`) tem os 14 jogos de cada concurso aberto (em
 
 ### Histórico das previsões da Loteca
 
-Antes do prazo das apostas, as probabilidades e o palpite (resultado mais provável) de cada um dos 14 jogos são gravados em `loteca_registro.json`. A previsão pode ser atualizada até o fim do prazo, porque as odds mudam durante a semana, e depois fica congelada. Quando os resultados entram no `loteca.csv`, o registro confere acertos, **% de acerto**, log loss e Brier de cada concurso. A página mostra a tabela e o resumo (% de acerto geral, acertos por concurso, comparação com os 33% do chute). O navegador também confere concursos já jogados que o registro ainda não conferiu.
+Antes do prazo das apostas, as probabilidades e o palpite (resultado mais provável) de cada um dos 14 jogos são gravados em `loteca_registro.json`. A previsão pode ser atualizada até o fim do prazo, porque as odds mudam durante a semana, e depois fica congelada. Quando os resultados entram no `loteca.csv`, o registro confere acertos, **% de acerto**, log loss e Brier de cada concurso. A página mostra a tabela e o resumo (% de acerto geral, acertos por concurso, comparação com os 33% do chute); **clicar num concurso abre os 14 jogos** com placar, probabilidades registradas, palpite e se acertou. O navegador também confere concursos já jogados que o registro ainda não conferiu.
 
 Como a Caixa bloqueia servidores fora do Brasil, o registro roda numa máquina no Brasil com `scripts/registrar_loteca.sh`: atualiza o histórico, registra, confere, faz commit e push (o Netlify publica). Detalhes e agendamento em [docs/loteca.md](docs/loteca.md#histórico-das-previsões).
 

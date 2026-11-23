@@ -259,7 +259,11 @@ function renderBacktest(d: LotecaData): void {
 }
 
 // ── Histórico das previsões ──────────────────────────────────────
+const openRounds = new Set<number>();   // concursos com os detalhes abertos
+let registry: Registry | null = null;
+
 function renderRegistry(reg: Registry | null): void {
+  registry = reg;
   const box = byId('reg-content');
   const rounds = reg?.rounds ?? [];
   if (!rounds.length) {
@@ -284,24 +288,86 @@ function renderRegistry(reg: Registry | null): void {
   }
   html += `
     <div class="val-extra">
-      <table class="metric-table hist-table">
-        <caption class="sr-only">Previsões registradas da Loteca e acertos</caption>
+      <table class="metric-table hist-table reg-table">
+        <caption class="sr-only">Previsões registradas da Loteca e acertos. Abra um concurso para ver os jogos.</caption>
         <thead><tr><th scope="col">Concurso</th><th scope="col">Registrada em</th><th scope="col">Acertos</th><th scope="col">% de acerto</th><th scope="col">Jogos com odds</th></tr></thead>
         <tbody>${rounds.map(r => {
           const res = r.result;
           const odds = r.games.filter(g => g.source === 'odds').length;
-          return `<tr>
-            <th scope="row">${esc(r.number)}<br><small>${esc(fmtDate(r.date))}${r.checked_in_browser ? ' · conferido agora' : ''}</small></th>
+          const open = openRounds.has(r.number);
+          return `<tr class="reg-row${open ? ' is-open' : ''}" data-n="${r.number}">
+            <th scope="row">
+              <button type="button" class="reg-toggle" aria-expanded="${open}" aria-controls="reg-det-${r.number}">
+                <span class="reg-caret" aria-hidden="true">▸</span> ${esc(r.number)}<span class="sr-only">: ver jogos e resultados</span>
+              </button>
+              <br><small>${esc(fmtDate(r.date))}${r.checked_in_browser ? ' · conferido agora' : ''}</small></th>
             <td>${stamp(r.first_registered_at)}${r.registered_at !== r.first_registered_at ? `<br><small>atualizada em ${stamp(r.registered_at)}</small>` : ''}</td>
             <td>${res ? `<strong>${res.hits}</strong> de ${res.games}` : '<small>aguardando os jogos</small>'}</td>
             <td>${res ? pct(res.pct) : '—'}</td>
-            <td>${res ? `${res.hits_odds} de ${res.games_odds} certos` : `${odds} de ${r.games.length}`}</td></tr>`;
+            <td>${res ? `${res.hits_odds} de ${res.games_odds} certos` : `${odds} de ${r.games.length}`}</td></tr>
+          <tr class="reg-detail" id="reg-det-${r.number}"${open ? '' : ' hidden'}><td colspan="5">${open ? registryDetail(r) : ''}</td></tr>`;
         }).join('')}</tbody>
       </table>
-      <div class="val-note">A previsão pode ser atualizada até o fim do prazo das apostas (as odds mudam durante a semana); depois disso fica congelada.
+      <div class="val-note">Clique num concurso para ver os 14 jogos, os placares e o que foi previsto.
+        A previsão pode ser atualizada até o fim do prazo das apostas (as odds mudam durante a semana); depois disso fica congelada.
         ${pending.length ? `Pendentes: ${pending.map(r => r.number).join(', ')}.` : ''}</div>
     </div>`;
   box.innerHTML = html;
+}
+
+/** Detalhes de um concurso do registro: dados do concurso e os 14 jogos. */
+function registryDetail(r: Registry['rounds'][number]): string {
+  const res = r.result;
+  const stamp = (s: string | null | undefined) => (s ? esc(fmtDate(s)) : '—');  // fmtDate já inclui a hora
+  const facts = [
+    `<div><span>Concurso</span><strong>${esc(r.number)}</strong></div>`,
+    `<div><span>Data</span><strong>${esc(weekdayOf(r.date))}, ${esc(fmtDate(r.date))}</strong></div>`,
+    r.deadline ? `<div><span>Prazo das apostas</span><strong>${stamp(r.deadline)}</strong></div>` : '',
+    `<div><span>Previsão registrada</span><strong>${stamp(r.first_registered_at)}</strong></div>`,
+    r.registered_at !== r.first_registered_at ? `<div><span>Última atualização</span><strong>${stamp(r.registered_at)}</strong></div>` : '',
+    res ? `<div><span>Acertos</span><strong>${res.hits} de ${res.games} (${pct(res.pct)})</strong></div>` : '<div><span>Situação</span><strong>aguardando os jogos</strong></div>',
+    res ? `<div><span>Com odds / com Elo</span><strong>${res.hits_odds} de ${res.games_odds} · ${res.hits - res.hits_odds} de ${res.games - res.games_odds}</strong></div>` : '',
+    res?.log_loss != null ? `<div><span>Log loss · Brier</span><strong>${res.log_loss.toFixed(3)} · ${res.brier?.toFixed(3) ?? '—'}</strong></div>` : '',
+  ].join('');
+  const rows = r.games.map(g => {
+    const real = g.outcome;
+    const chips = OUTCOMES.map((o, k) => {
+      const cls = `lt-pick${o === g.pick ? ' is-on' : ''}${o === real ? ' is-real' : ''}`;
+      return `<span class="${cls}"><b>${o}</b><small>${pct(g.probs[k]!)}</small></span>`;
+    }).join('');
+    const label = `Probabilidades: ${OUTCOMES.map((o, k) => `${OUTCOME_LABEL[o]} ${pct(g.probs[k]!)}`).join(', ')}. Palpite: ${OUTCOME_LABEL[g.pick]}${real ? `. Resultado: ${OUTCOME_LABEL[real]}` : ''}`;
+    const status = real == null ? '<small>aguardando</small>'
+      : g.hit ? '<span class="reg-hit">✓ acertou</span>' : '<span class="reg-miss">✗ errou</span>';
+    const score = g.goals ? `${g.goals[0]} x ${g.goals[1]}` : '—';
+    return `<tr>
+      <td class="reg-seq">${esc(g.seq)}</td>
+      <th scope="row">${esc(g.home)} <span aria-hidden="true">×</span><span class="sr-only">contra</span> ${esc(g.away)}<br><small>${esc(weekdayOf(g.date))} ${esc(fmtDate(g.date))}</small></th>
+      <td class="reg-score">${score}</td>
+      <td><div class="lt-picks" role="img" aria-label="${esc(label)}">${chips}</div></td>
+      <td><small>${g.source === 'odds' ? 'Odds' : 'Elo'}</small></td>
+      <td>${status}</td></tr>`;
+  }).join('');
+  return `
+    <div class="reg-detail-box">
+      <div class="reg-facts">${facts}</div>
+      <table class="metric-table reg-games">
+        <caption class="sr-only">Jogos do concurso ${esc(r.number)}: placar, probabilidades registradas, palpite e resultado</caption>
+        <thead><tr><th scope="col">#</th><th scope="col">Jogo</th><th scope="col">Placar</th><th scope="col">Previsão (1 / X / 2)</th><th scope="col">Fonte</th><th scope="col">Resultado</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p class="val-note">Dourado = palpite (resultado mais provável); contorno verde = o que aconteceu.</p>
+    </div>`;
+}
+
+function setupRegistryToggle(): void {
+  byId('reg-content').addEventListener('click', e => {
+    const row = (e.target as Element).closest<HTMLElement>('tr.reg-row');
+    if (!row) return;
+    const n = Number(row.dataset.n);
+    if (openRounds.has(n)) openRounds.delete(n); else openRounds.add(n);
+    renderRegistry(registry);
+    document.querySelector<HTMLElement>(`tr.reg-row[data-n="${n}"] .reg-toggle`)?.focus();
+  });
 }
 
 /** Confere no navegador concursos registrados que já têm resultado na Caixa. */
@@ -317,7 +383,8 @@ function checkRegistryInBrowser(reg: Registry | null): void {
         g.nuGolEquipeUm > g.nuGolEquipeDois ? '1' : g.nuGolEquipeUm === g.nuGolEquipeDois ? 'X' : '2']));
       const scored = r.games.filter(g => outcome.has(g.seq));
       if (!scored.length) return;
-      for (const g of scored) { g.outcome = outcome.get(g.seq); g.hit = g.pick === g.outcome; }
+      const goals = new Map<number, [number, number]>(list.map(g => [g.nuSequencial, [g.nuGolEquipeUm, g.nuGolEquipeDois]]));
+      for (const g of scored) { g.outcome = outcome.get(g.seq); g.hit = g.pick === g.outcome; g.goals = goals.get(g.seq); }
       const hits = scored.filter(g => g.hit).length;
       const withOdds = scored.filter(g => g.source === 'odds');
       r.result = {
@@ -375,6 +442,7 @@ function init(d: LotecaData): void {
   applyRounds(d.rounds ?? []);
   renderBacktest(d);
   setupTabs();
+  setupRegistryToggle();
   showApp();
   void refreshFromCaixa();
   void getJson<Registry>('./loteca_registro.json').then(reg => {

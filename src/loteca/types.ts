@@ -128,6 +128,7 @@ export interface RegistryGame {
   pick: Outcome;
   outcome?: Outcome;
   hit?: boolean;
+  goals?: [number, number];        // placar (mandante, visitante), depois dos jogos
 }
 
 export interface RegistryResult {
